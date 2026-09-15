@@ -1,0 +1,85 @@
+import { ACCENT_CLASSES, cn, getFaviconUrl, getInitial } from "@/lib/utils";
+import type { AccentToken } from "@/types";
+import { useState } from "react";
+
+interface TileProps {
+  title: string;
+  url?: string;
+  accent: AccentToken;
+  size?: "lg" | "md" | "sm";
+  className?: string;
+  /** Render children instead of a favicon/initial — used for folder previews. */
+  children?: React.ReactNode;
+}
+
+const SIZE_CLASSES: Record<NonNullable<TileProps["size"]>, string> = {
+  lg: "h-12 w-12",
+  md: "h-10 w-10",
+  sm: "h-7 w-7",
+};
+
+export function Tile({
+  title,
+  url,
+  accent,
+  size = "lg",
+  className,
+  children,
+}: TileProps) {
+  const [faviconFailed, setFaviconFailed] = useState(false);
+  const favicon = url ? getFaviconUrl(url) : null;
+  const showFavicon = favicon && !faviconFailed;
+
+  if (children) {
+    return (
+      <div
+        className={cn(
+          "relative flex shrink-0 items-center justify-center overflow-hidden",
+          "rounded-[22.5%] border border-white/20 bg-white/[0.16] shadow-[0_4px_12px_rgba(0,0,0,0.3)] backdrop-blur-xl",
+          "transition-transform duration-200 ease-out",
+          SIZE_CLASSES[size],
+          className,
+        )}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  if (showFavicon) {
+    return (
+      <img
+        src={favicon}
+        alt=""
+        draggable={false}
+        className={cn(
+          "shrink-0 select-none object-cover rounded-[22.5%]",
+          "drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]",
+          "transition-transform duration-200 ease-out",
+          SIZE_CLASSES[size],
+          className,
+        )}
+        onError={() => setFaviconFailed(true)}
+      />
+    );
+  }
+
+  const { tile } = ACCENT_CLASSES[accent];
+
+  return (
+    <div
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden",
+        "rounded-[22.5%] bg-gradient-to-br shadow-[0_4px_12px_rgba(0,0,0,0.3)]",
+        "transition-transform duration-200 ease-out",
+        tile,
+        SIZE_CLASSES[size],
+        className,
+      )}
+    >
+      <span className="select-none text-xs font-semibold text-white/95">
+        {getInitial(title)}
+      </span>
+    </div>
+  );
+}
