@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Tile } from '../shortcut/Tile';
 import { useLaunchpadStore, selectFolderChildren } from '@/store/useLaunchpadStore';
+import { openShortcutUrl } from '@/lib/utils';
 import type { FolderItem } from '@/types';
 
 /**
@@ -13,6 +14,7 @@ export function FolderOverlay() {
   const openFolderId = useLaunchpadStore((state) => state.openFolderId);
   const items = useLaunchpadStore((state) => state.items);
   const closeFolder = useLaunchpadStore((state) => state.closeFolder);
+  const openLinks = useLaunchpadStore((state) => state.settings?.openLinks ?? 'newTab');
 
   const folder = items.find(
     (item): item is FolderItem => item.type === 'folder' && item.id === openFolderId,
@@ -51,8 +53,8 @@ export function FolderOverlay() {
                 child.type === 'shortcut' ? (
                   <button
                     key={child.id}
-                    className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105 active:scale-95"
-                    onClick={() => window.open(child.url, '_blank', 'noopener,noreferrer')}
+                    className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                    onClick={() => openShortcutUrl(child.url, openLinks)}
                   >
                     <Tile title={child.title} url={child.url} accent={child.accent} size="md" />
                     <span className="max-w-[4.75rem] truncate text-center text-caption font-normal text-white/80">

@@ -27,7 +27,13 @@ export default defineConfig({
         "128": "icon-128.png",
       },
     },
-    permissions: ["storage", "contextMenus", "tabs", "unlimitedStorage"],
+    permissions: [
+      "storage",
+      "contextMenus",
+      "tabs",
+      "tabGroups",
+      "unlimitedStorage",
+    ],
     optional_permissions: ["bookmarks"],
   },
 });

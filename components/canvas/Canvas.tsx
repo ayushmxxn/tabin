@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Shortcut } from '../shortcut/Shortcut';
 import {
@@ -25,6 +25,10 @@ export function Canvas() {
   const activePageIndex = useLaunchpadStore((state) => state.activePageIndex);
   const setActivePageIndex = useLaunchpadStore((state) => state.setActivePageIndex);
   const setAddModalOpen = useLaunchpadStore((state) => state.setAddModalOpen);
+  const spaces = useLaunchpadStore((state) => state.spaces);
+  const activeSpaceIndex = useLaunchpadStore((state) => state.activeSpaceIndex);
+  const spacesEnabled = useLaunchpadStore((state) => state.settings?.spacesEnabled ?? false);
+  const activeSpace = spaces[activeSpaceIndex] ?? spaces[0] ?? { id: 'space-home', name: 'Home' };
 
   const { columns } = useCanvasGrid(canvasRef, gridColumns);
 
@@ -112,11 +116,16 @@ export function Canvas() {
     return () => document.removeEventListener('contextmenu', handleContextMenu);
   }, []);
 
-  const displayItems: LaunchpadItem[] = activeFolder
-    ? selectFolderChildren(items, activeFolder)
-    : items.filter(
-        (item): item is ShortcutItem => item.type === 'shortcut' && item.folderId === null,
-      );
+  const displayItems = useMemo<LaunchpadItem[]>(() => {
+    return activeFolder
+      ? selectFolderChildren(items, activeFolder)
+      : items.filter(
+          (item): item is ShortcutItem =>
+            item.type === 'shortcut' &&
+            item.folderId === null &&
+            (!spacesEnabled || item.spaceId === activeSpace.id),
+        );
+  }, [items, activeFolder, spacesEnabled, activeSpace.id]);
 
   const pageSize = columns * PAGE_ROWS;
   const totalPages = isFolderActive ? 1 : Math.max(1, Math.ceil(displayItems.length / pageSize));
@@ -138,7 +147,9 @@ export function Canvas() {
     prevPageRef.current = safePageIndex;
   }, [safePageIndex]);
 
-  const destinationKey = activeFolder ? `folder-${activeFolder.id}` : `screen-${safePageIndex}`;
+  const destinationKey = activeFolder
+    ? `folder-${activeFolder.id}`
+    : `space-${spacesEnabled ? activeSpace.id : 'all'}-screen-${safePageIndex}`;
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (ctxMenu) {

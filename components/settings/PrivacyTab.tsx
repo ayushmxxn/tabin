@@ -55,10 +55,10 @@ export function PrivacyTab() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11.5px] font-medium text-emerald-300"
+            className="inline-flex w-fit max-w-[calc(100%-2.5rem)] items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[11.5px] font-medium text-emerald-300"
           >
             <span className="shrink-0 text-[13px]">✓</span>
-            {toastMessage}
+            <span className="truncate">{toastMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>

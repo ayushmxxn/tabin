@@ -1,10 +1,30 @@
-import type { AccentToken } from "@/types";
+import type { AccentToken, OpenLinksMode } from "@/types";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 /** Merge Tailwind class lists, letting later classes win on conflicts. */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Opens a shortcut URL according to the user's Open links preference.
+ * - 'newTab': Opens in a new browser tab without focusing away.
+ * - 'sameTab': Navigates the current tab directly to the URL.
+ */
+export function openShortcutUrl(url: string, mode: OpenLinksMode = "newTab") {
+  if (!url) return;
+  if (mode === "sameTab") {
+    if (typeof chrome !== "undefined" && chrome.tabs?.update) {
+      chrome.tabs.update({ url }).catch(() => {
+        window.location.href = url;
+      });
+    } else {
+      window.location.href = url;
+    }
+  } else {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
 }
 
 /**

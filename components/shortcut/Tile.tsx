@@ -1,6 +1,6 @@
 import { ACCENT_CLASSES, cn, getFaviconUrl, getInitial } from "@/lib/utils";
 import type { AccentToken } from "@/types";
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 
 interface TileProps {
   title: string;
@@ -19,7 +19,7 @@ const SIZE_CLASSES: Record<NonNullable<TileProps["size"]>, string> = {
   sm: "h-7 w-7",
 };
 
-export function Tile({
+export const Tile = memo(function Tile({
   title,
   url,
   customIcon,
@@ -58,6 +58,8 @@ export function Tile({
         src={favicon}
         alt=""
         draggable={false}
+        loading="lazy"
+        decoding="async"
         className={cn(
           "shrink-0 select-none object-cover rounded-[22.5%]",
           "drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]",
@@ -88,4 +90,4 @@ export function Tile({
       </span>
     </div>
   );
-}
+});

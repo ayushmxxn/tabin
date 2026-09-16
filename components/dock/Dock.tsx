@@ -7,11 +7,11 @@ import {
 } from "@/store/useLaunchpadStore";
 import type { FolderItem, LaunchpadItem, ShortcutItem } from "@/types";
 import { AnimatePresence, motion, Reorder } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo, useMemo } from "react";
 import { Folder } from "../folder/Folder";
 import { FolderColorPicker } from "../folder/FolderColorPicker";
 
-function DockFolderItem({
+const DockFolderItem = memo(function DockFolderItem({
   folder,
   items,
   openFolderId,
@@ -35,8 +35,9 @@ function DockFolderItem({
   const folderButtonRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const updateItem = useLaunchpadStore((state) => state.updateItem);
-  const dragOverFolderId = useLaunchpadStore((state) => state.dragOverFolderId);
-  const isDragOver = dragOverFolderId === folder.id;
+  const isDragOver = useLaunchpadStore(
+    (state) => state.dragOverFolderId === folder.id,
+  );
 
   const isActive = openFolderId === folder.id;
   const folderColor = folder.color || DEFAULT_FOLDER_COLOR;
@@ -312,7 +313,7 @@ function DockFolderItem({
       </motion.div>
     </div>
   );
-}
+});
 
 export function Dock() {
   const items = useLaunchpadStore((state) => state.items);
@@ -326,8 +327,15 @@ export function Dock() {
   const dockMagnification = useLaunchpadStore(
     (state) => state.settings?.dockMagnification ?? true,
   );
+  const spaces = useLaunchpadStore((state) => state.spaces);
+  const activeSpaceIndex = useLaunchpadStore((state) => state.activeSpaceIndex);
+  const spacesEnabled = useLaunchpadStore((state) => state.settings?.spacesEnabled ?? false);
+  const activeSpace = spaces[activeSpaceIndex] ?? spaces[0] ?? { id: 'space-home', name: 'Home' };
 
-  const dockFolders = selectDockFolders(items, dockIds);
+  const dockFolders = useMemo(() => {
+    const all = selectDockFolders(items, dockIds);
+    return spacesEnabled ? all.filter((f) => f.spaceId === activeSpace.id) : all;
+  }, [items, dockIds, spacesEnabled, activeSpace.id]);
   const isHomeActive = openFolderId === null;
   const [isHomeHovered, setIsHomeHovered] = useState(false);
   const [isAddHovered, setIsAddHovered] = useState(false);

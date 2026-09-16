@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, type RefObject } from 'react';
+import { useState, useRef, useEffect, memo, type RefObject } from 'react';
 import { AnimatePresence, motion, useDragControls } from 'motion/react';
 import { Tile } from './Tile';
 import { useCanvasDrag } from '@/hooks/useCanvasDrag';
 import { useLaunchpadStore } from '@/store/useLaunchpadStore';
-import { cn, getHostname } from '@/lib/utils';
+import { cn, getHostname, openShortcutUrl } from '@/lib/utils';
 import type { ShortcutItem } from '@/types';
 
 interface ShortcutProps {
@@ -17,7 +17,7 @@ interface ShortcutProps {
   folderOrigin?: { x: number; y: number } | null;
 }
 
-export function Shortcut({
+export const Shortcut = memo(function Shortcut({
   item,
   position,
   canvasRef,
@@ -30,13 +30,13 @@ export function Shortcut({
   const reorderCanvasItems = useLaunchpadStore((state) => state.reorderCanvasItems);
   const updateItem = useLaunchpadStore((state) => state.updateItem);
   const deleteItem = useLaunchpadStore((state) => state.deleteItem);
-  const activeShortcutMenuId = useLaunchpadStore((state) => state.activeShortcutMenuId);
   const setActiveShortcutMenuId = useLaunchpadStore((state) => state.setActiveShortcutMenuId);
-  const hoveredShortcutId = useLaunchpadStore((state) => state.hoveredShortcutId);
   const setHoveredShortcutId = useLaunchpadStore((state) => state.setHoveredShortcutId);
+  const openLinks = useLaunchpadStore((state) => state.settings?.openLinks ?? 'newTab');
 
-  const isMenuOpen = activeShortcutMenuId === item.id;
-  const isHovered = hoveredShortcutId === item.id;
+  const isMenuOpen = useLaunchpadStore((state) => state.activeShortcutMenuId === item.id);
+  const hasAnyMenuOpen = useLaunchpadStore((state) => state.activeShortcutMenuId !== null);
+  const isHovered = useLaunchpadStore((state) => state.hoveredShortcutId === item.id);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(item.title);
   const [isPressed, setIsPressed] = useState(false);
@@ -57,7 +57,7 @@ export function Shortcut({
     columns,
     pageOffset,
     onReorder: (targetIndex) => reorderCanvasItems(item.id, targetIndex),
-    onActivate: () => window.open(item.url, '_blank', 'noopener,noreferrer'),
+    onActivate: () => openShortcutUrl(item.url, openLinks),
   });
 
   useEffect(() => {
@@ -172,7 +172,7 @@ export function Shortcut({
       layout
       onMouseEnter={() => setHoveredShortcutId(item.id)}
       onMouseLeave={() => {
-        if (hoveredShortcutId === item.id) {
+        if (isHovered) {
           setHoveredShortcutId(null);
         }
         setIsPressed(false);
@@ -255,7 +255,7 @@ export function Shortcut({
     >
       {/* Hover Edit Tooltip */}
       <AnimatePresence>
-        {isHovered && !isDragging && !isPressed && !activeShortcutMenuId && (
+        {isHovered && !isDragging && !isPressed && !hasAnyMenuOpen && (
           <motion.div
             initial={{ opacity: 0, y: 3, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -537,4 +537,4 @@ export function Shortcut({
       />
     </motion.div>
   );
-}
+});

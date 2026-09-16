@@ -20,6 +20,9 @@ export const DEFAULT_SETTINGS: LaunchpadSettings = {
   dockMagnification: false,
   dockScale: 48,
   searchEngine: 'google',
+  spacesEnabled: false,
+  defaultSpaceId: 'space-home',
+  openLinks: 'newTab',
 };
 
 export interface DeletionRecord {
@@ -74,6 +77,12 @@ interface LaunchpadState {
   setActiveSpaceIndex: (index: number) => void;
   goToNextSpace: () => void;
   goToPrevSpace: () => void;
+  createSpace: (name: string) => Space;
+  renameSpace: (id: string, name: string) => void;
+  deleteSpace: (id: string) => void;
+  reorderSpaces: (spaces: Space[]) => void;
+  setDefaultSpace: (id: string) => void;
+  switchSpace: (idOrIndex: string | number) => void;
 
   // Canvas items
   moveItem: (id: string, position: Position) => void;
@@ -210,28 +219,128 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
       activePageIndex: 0,
       setActivePageIndex: (index) =>
-        set({ activePageIndex: Math.max(0, index), activeSpaceIndex: Math.max(0, index), openFolderId: null }),
+        set({ activePageIndex: Math.max(0, index), openFolderId: null }),
       goToNextPage: (maxPages) => {
         const { activePageIndex } = get();
         if (maxPages === undefined || activePageIndex < maxPages - 1) {
           const next = activePageIndex + 1;
-          set({ activePageIndex: next, activeSpaceIndex: next, openFolderId: null });
+          set({ activePageIndex: next, openFolderId: null });
         }
       },
       goToPrevPage: () => {
         const { activePageIndex } = get();
         if (activePageIndex > 0) {
           const prev = activePageIndex - 1;
-          set({ activePageIndex: prev, activeSpaceIndex: prev, openFolderId: null });
+          set({ activePageIndex: prev, openFolderId: null });
         }
       },
 
       setActiveSpaceIndex: (index) => {
-        const clamped = Math.max(0, index);
-        set({ activeSpaceIndex: clamped, activePageIndex: clamped, openFolderId: null });
+        const clamped = Math.max(0, Math.min(index, get().spaces.length - 1));
+        set({ activeSpaceIndex: clamped, activePageIndex: 0, openFolderId: null });
       },
-      goToNextSpace: () => get().goToNextPage(),
-      goToPrevSpace: () => get().goToPrevPage(),
+      goToNextSpace: () => {
+        const { activeSpaceIndex, spaces } = get();
+        if (activeSpaceIndex < spaces.length - 1) {
+          get().switchSpace(activeSpaceIndex + 1);
+        }
+      },
+      goToPrevSpace: () => {
+        const { activeSpaceIndex } = get();
+        if (activeSpaceIndex > 0) {
+          get().switchSpace(activeSpaceIndex - 1);
+        }
+      },
+
+      createSpace: (name) => {
+        const trimmed = name.trim() || 'New Space';
+        const newSpace: Space = {
+          id: `space-${Date.now()}`,
+          name: trimmed,
+        };
+        set((state) => ({
+          spaces: [...state.spaces, newSpace],
+        }));
+        return newSpace;
+      },
+
+      renameSpace: (id, name) => {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        set((state) => ({
+          spaces: state.spaces.map((s) => (s.id === id ? { ...s, name: trimmed } : s)),
+        }));
+      },
+
+      deleteSpace: (id) => {
+        if (id === 'space-home') return;
+        const { spaces, activeSpaceIndex, settings } = get();
+        const spaceToDeleteIndex = spaces.findIndex((s) => s.id === id);
+        if (spaceToDeleteIndex === -1) return;
+
+        const nextSpaces = spaces.filter((s) => s.id !== id);
+        let nextActiveIndex = activeSpaceIndex;
+        if (activeSpaceIndex >= spaceToDeleteIndex) {
+          nextActiveIndex = Math.max(0, activeSpaceIndex - 1);
+        }
+        if (nextActiveIndex >= nextSpaces.length) {
+          nextActiveIndex = Math.max(0, nextSpaces.length - 1);
+        }
+
+        const nextDefaultSpaceId =
+          settings.defaultSpaceId === id ? 'space-home' : (settings.defaultSpaceId ?? 'space-home');
+
+        set((state) => ({
+          spaces: nextSpaces,
+          activeSpaceIndex: nextActiveIndex,
+          activePageIndex: 0,
+          openFolderId: null,
+          settings: {
+            ...state.settings,
+            defaultSpaceId: nextDefaultSpaceId,
+          },
+          items: state.items.filter((item) => item.spaceId !== id),
+          dockIds: state.dockIds.filter((dockId) => {
+            const item = state.items.find((i) => i.id === dockId);
+            return !item || item.spaceId !== id;
+          }),
+        }));
+      },
+
+      reorderSpaces: (spaces) => {
+        const currentActiveSpace = get().spaces[get().activeSpaceIndex];
+        let nextActiveIndex = 0;
+        if (currentActiveSpace) {
+          const idx = spaces.findIndex((s) => s.id === currentActiveSpace.id);
+          if (idx !== -1) nextActiveIndex = idx;
+        }
+        set({ spaces, activeSpaceIndex: nextActiveIndex });
+      },
+
+      setDefaultSpace: (id) => {
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            defaultSpaceId: id,
+          },
+        }));
+      },
+
+      switchSpace: (idOrIndex) => {
+        const { spaces } = get();
+        let index: number;
+        if (typeof idOrIndex === 'number') {
+          index = Math.max(0, Math.min(idOrIndex, spaces.length - 1));
+        } else {
+          index = spaces.findIndex((s) => s.id === idOrIndex);
+          if (index === -1) index = 0;
+        }
+        set({
+          activeSpaceIndex: index,
+          activePageIndex: 0,
+          openFolderId: null,
+        });
+      },
 
       moveItem: (id, position) => {
         set((state) => ({
@@ -242,7 +351,8 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       },
 
       addShortcut: ({ title, url, spaceId, folderId, accent = 'violet', addToDock = false, customIcon }) => {
-        const targetSpaceId = spaceId ?? (get().spaces[get().activeSpaceIndex]?.id ?? 'space-home');
+        const spacesEnabled = get().settings?.spacesEnabled ?? false;
+        const targetSpaceId = spaceId ?? (spacesEnabled ? (get().spaces[get().activeSpaceIndex]?.id ?? 'space-home') : 'space-home');
         const targetFolderId = folderId !== undefined ? folderId : get().openFolderId;
         const id = `shortcut-${Date.now()}`;
         const normalizedUrl = url.startsWith('http://') || url.startsWith('https://')
@@ -286,7 +396,8 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         accent = 'blue',
         color = DEFAULT_FOLDER_COLOR,
       }) => {
-        const targetSpaceId = spaceId ?? (get().spaces[get().activeSpaceIndex]?.id ?? 'space-home');
+        const spacesEnabled = get().settings?.spacesEnabled ?? false;
+        const targetSpaceId = spaceId ?? (spacesEnabled ? (get().spaces[get().activeSpaceIndex]?.id ?? 'space-home') : 'space-home');
         const id = `folder-${Date.now()}`;
         const newFolder: FolderItem = {
           id,
@@ -788,6 +899,14 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         wallpaper: state.wallpaper,
         settings: state.settings,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.settings?.spacesEnabled && state.settings.defaultSpaceId && state.spaces) {
+          const defaultIndex = state.spaces.findIndex((s) => s.id === state.settings.defaultSpaceId);
+          if (defaultIndex !== -1) {
+            state.activeSpaceIndex = defaultIndex;
+          }
+        }
+      },
     },
   ),
 );
@@ -806,6 +925,7 @@ export function syncStoreFromExternal(data: unknown) {
         items: incomingState.items ?? current.items,
         dockIds: incomingState.dockIds ?? current.dockIds,
         spaces: incomingState.spaces ?? current.spaces,
+        settings: incomingState.settings ? { ...current.settings, ...incomingState.settings } : current.settings,
       }));
     }
   } catch (err) {

@@ -1,4 +1,4 @@
-import { getHostname } from "@/lib/utils";
+import { getHostname, openShortcutUrl } from "@/lib/utils";
 import { useLaunchpadStore, selectFolderChildren } from "@/store/useLaunchpadStore";
 import { useColumns, PAGE_ROWS } from "@/lib/layout";
 import type { FolderItem, LaunchpadItem, ShortcutItem } from "@/types";
@@ -66,6 +66,7 @@ export function Search() {
   const openFolderId = useLaunchpadStore((state) => state.openFolderId);
   const activePageIndex = useLaunchpadStore((state) => state.activePageIndex);
   const gridColumns = useLaunchpadStore((state) => state.settings?.gridColumns ?? 'auto');
+  const openLinks = useLaunchpadStore((state) => state.settings?.openLinks ?? 'newTab');
 
   const columns = useColumns(gridColumns);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -81,6 +82,9 @@ export function Search() {
   const query = searchQuery.trim().toLowerCase();
 
   const results = useMemo(() => {
+    if (!isSearchOpen && !query) {
+      return [];
+    }
     if (!query) {
       return searchableItems.slice(0, 8);
     }
@@ -89,7 +93,7 @@ export function Search() {
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score)
       .map(({ item }) => item);
-  }, [searchableItems, query]);
+  }, [searchableItems, query, isSearchOpen]);
 
   // Reset selected index whenever search opens or query changes
   useEffect(() => {
@@ -104,7 +108,7 @@ export function Search() {
   }, [selectedIndex, isSearchOpen]);
 
   const openAndClose = (url: string) => {
-    window.open(url, "_blank", "noopener,noreferrer");
+    openShortcutUrl(url, openLinks);
     setSearchOpen(false);
     setSearchQuery("");
     inputRef.current?.blur();
@@ -207,7 +211,7 @@ export function Search() {
             if (item.type === "folder") {
               openFolder(item.id);
             } else if (item.type === "shortcut") {
-              window.open(item.url, "_blank", "noopener,noreferrer");
+              openShortcutUrl(item.url, openLinks);
             }
           }
         }

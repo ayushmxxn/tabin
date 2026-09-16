@@ -53,13 +53,15 @@ export function Wallpaper() {
     }
   }, [videoSrc]);
 
-  // Pause playback when tab is hidden to save CPU, GPU, and battery
+  // Pause playback when tab is hidden to save CPU, GPU, and battery (video only)
   useEffect(() => {
+    if (wallpaper?.type !== 'video' || !videoSrc) return;
+
     const handleVisibilityChange = () => {
       if (!videoRef.current) return;
       if (document.hidden) {
         videoRef.current.pause();
-      } else if (wallpaper?.type === 'video' && videoSrc) {
+      } else {
         videoRef.current.play().catch(() => {});
       }
     };
@@ -104,6 +106,8 @@ export function Wallpaper() {
           <img
             src={staticImageSrc}
             alt=""
+            fetchPriority="high"
+            decoding="async"
             aria-hidden="true"
             className="h-full w-full object-cover"
           />

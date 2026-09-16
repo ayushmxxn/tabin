@@ -7,12 +7,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ImportExportTab } from "./ImportExportTab";
 import { PrivacyTab } from "./PrivacyTab";
 import { AboutTab } from "./AboutTab";
+import { SpacesTab } from "./SpacesTab";
 import { saveLiveWallpaperBlob } from "@/lib/videoStorage";
 
 type SettingsTabId =
   | "wallpaper"
   | "layout"
   | "shortcuts"
+  | "spaces"
   | "backup"
   | "privacy"
   | "about";
@@ -84,6 +86,27 @@ const TABS: TabItem[] = [
       >
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+      </svg>
+    ),
+  },
+  {
+    id: "spaces",
+    label: "Spaces",
+    icon: (isActive) => (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={isActive ? "text-[#FA1E76]" : "text-white/45"}
+      >
+        <rect width="18" height="18" x="3" y="3" rx="3" />
+        <path d="M3 9h18" />
+        <path d="M9 21V9" />
       </svg>
     ),
   },
@@ -193,6 +216,7 @@ export function SettingsModal() {
   };
 
   useEffect(() => {
+    if (!isSettingsOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (pendingVideo) {
@@ -208,7 +232,7 @@ export function SettingsModal() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setSettingsOpen, itemToDelete, isResetConfirmOpen, pendingVideo]);
+  }, [isSettingsOpen, setSettingsOpen, itemToDelete, isResetConfirmOpen, pendingVideo]);
 
   if (!isSettingsOpen) return null;
 
@@ -674,6 +698,55 @@ export function SettingsModal() {
                   </div>
                 </div>
 
+                {/* Open Links Setting */}
+                <div className="flex items-center justify-between py-3 mb-4 border-y border-white/[0.06] gap-3 shrink-0">
+                  <div>
+                    <h4 className="text-[13px] font-medium text-white/85">
+                      Open links
+                    </h4>
+                    <p className="text-[11.5px] text-white/45 mt-0.5">
+                      Choose where shortcuts open when clicked.
+                    </p>
+                  </div>
+
+                  <div className="inline-flex p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] gap-1">
+                    {(
+                      [
+                        { id: "newTab", label: "New tab" },
+                        { id: "sameTab", label: "Same tab" },
+                      ] as const
+                    ).map((opt) => {
+                      const isSelected =
+                        (settings.openLinks ?? "newTab") === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => updateSettings({ openLinks: opt.id })}
+                          className={`relative px-3.5 py-1.5 text-[12px] font-medium rounded-lg transition-colors cursor-pointer ${
+                            isSelected
+                              ? "text-white"
+                              : "text-white/50 hover:text-white/80"
+                          }`}
+                        >
+                          {isSelected && (
+                            <motion.div
+                              layoutId="settings-open-links-pill"
+                              className="absolute inset-0 rounded-lg bg-white/[0.12] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 450,
+                                damping: 35,
+                              }}
+                            />
+                          )}
+                          <span className="relative z-10">{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-white/[0.06] bg-white/[0.015] divide-y divide-white/[0.04]">
                   {items.length === 0 ? (
                     <div className="p-8 text-center text-[12px] text-white/40">
@@ -737,6 +810,9 @@ export function SettingsModal() {
                 </div>
               </div>
             )}
+
+            {/* Spaces Tab */}
+            {activeTab === "spaces" && <SpacesTab />}
 
             {/* Import / Export Tab */}
             {activeTab === "backup" && <ImportExportTab />}

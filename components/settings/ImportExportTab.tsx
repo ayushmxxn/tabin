@@ -317,14 +317,14 @@ export function ImportExportTab() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className={`mb-5 flex items-center gap-2 rounded-lg px-3 py-2.5 text-[11.5px] font-medium leading-none ${
+            className={`mb-5 inline-flex w-fit max-w-[calc(100%-2.5rem)] items-center gap-2 rounded-lg px-3 py-2.5 text-[11.5px] font-medium leading-none ${
               toast.ok
                 ? 'bg-emerald-500/10 text-emerald-300'
                 : 'bg-red-500/[0.09] text-red-300/90'
             }`}
           >
             <span className="shrink-0 text-[13px]">{toast.ok ? '✓' : '✕'}</span>
-            {toast.msg}
+            <span className="truncate">{toast.msg}</span>
           </motion.div>
         )}
       </AnimatePresence>

@@ -4,7 +4,7 @@ import { getFolderTheme } from "@/lib/folderColors";
 import { ACCENT_CLASSES, cn, getFaviconUrl, getInitial } from "@/lib/utils";
 import type { ShortcutItem } from "@/types";
 import { motion } from "motion/react";
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 
 const sizeScales = {
   sm: 0.65,
@@ -26,7 +26,7 @@ const BASE_HEIGHT = 270;
 const FLAP_PATH =
   "M0 25C0 11.1929 11.1929 0 25 0H136.084C143.044 0 149.689 2.90139 154.42 8.00608L178.08 33.5343C182.811 38.639 189.456 41.5404 196.416 41.5404H296C309.807 41.5404 321 52.7333 321 66.5404V216C321 229.807 309.807 241 296 241H25C11.1929 241 0 229.807 0 216V25Z";
 
-const FolderIcon = ({ item }: { item?: ShortcutItem }) => {
+const FolderIcon = memo(({ item }: { item?: ShortcutItem }) => {
   const [faviconFailed, setFaviconFailed] = useState(false);
   if (!item) return null;
 
@@ -42,6 +42,8 @@ const FolderIcon = ({ item }: { item?: ShortcutItem }) => {
           src={favicon}
           alt={item.title}
           draggable={false}
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover rounded-[22.5%]"
           onError={() => setFaviconFailed(true)}
         />
@@ -57,9 +59,9 @@ const FolderIcon = ({ item }: { item?: ShortcutItem }) => {
       )}
     </div>
   );
-};
+});
 
-const FolderComponent = ({
+const FolderComponent = memo(({
   color = "blue",
   size = "md",
   items = [],
@@ -272,7 +274,7 @@ const FolderComponent = ({
       </div>
     </div>
   );
-};
+});
 
 export default FolderComponent;
 

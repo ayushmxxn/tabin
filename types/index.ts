@@ -78,10 +78,15 @@ export interface WallpaperConfig {
 
 export type GridColumnsMode = 'auto' | '6' | '7' | '8' | '10';
 
+export type OpenLinksMode = 'newTab' | 'sameTab';
+
 export interface LaunchpadSettings {
   gridColumns: GridColumnsMode;
   iconScale: 'compact' | 'standard' | 'large';
   dockMagnification: boolean;
   dockScale: number; // 40 - 64 px
   searchEngine: 'google' | 'duckduckgo' | 'bing';
+  spacesEnabled?: boolean;
+  defaultSpaceId?: string;
+  openLinks?: OpenLinksMode;
 }
