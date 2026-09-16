@@ -5,6 +5,7 @@ import { Search } from "@/components/search/Search";
 import { SpaceIndicator } from "@/components/spaces/SpaceIndicator";
 import { SpaceSwitcher } from "@/components/spaces/SpaceSwitcher";
 import { Wallpaper } from "@/components/wallpaper/Wallpaper";
+import { TopRightNotch } from "@/components/notch/TopRightNotch";
 import { syncStoreFromExternal, useLaunchpadStore } from "@/store/useLaunchpadStore";
 import { lazy, Suspense, useEffect } from "react";
 
@@ -47,6 +48,7 @@ export default function App() {
         <Canvas />
       </main>
 
+      <TopRightNotch />
       <Search />
       <SpaceSwitcher />
       <SpaceIndicator />

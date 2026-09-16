@@ -230,7 +230,10 @@ export default defineBackground(() => {
   browser.action.enable();
 
   // Clicking pinned action icon captures all tabs, saves them, opens/focuses Saved Tabs page, and closes tabs
+  let isCapturing = false;
   browser.action.onClicked.addListener(async (activeTab) => {
+    if (isCapturing) return;
+    isCapturing = true;
     try {
       const currentWindowId = activeTab?.windowId ?? chrome.windows.WINDOW_ID_CURRENT;
       const allTabs = await chrome.tabs.query({ windowId: currentWindowId });
@@ -302,6 +305,8 @@ export default defineBackground(() => {
     } catch (err) {
       console.error("Failed to execute Tabin Saved Tabs capture:", err);
       // SAFETY: In case of any error, tabs remain completely open
+    } finally {
+      isCapturing = false;
     }
   });
 

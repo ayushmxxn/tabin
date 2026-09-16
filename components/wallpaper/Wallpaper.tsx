@@ -37,6 +37,13 @@ export function Wallpaper() {
       if (currentObjectUrl) {
         URL.revokeObjectURL(currentObjectUrl);
       }
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause();
+          videoRef.current.removeAttribute('src');
+          videoRef.current.load();
+        } catch {}
+      }
     };
   }, [wallpaper?.type, wallpaper?.videoFileName]);
 

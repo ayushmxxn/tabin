@@ -216,6 +216,14 @@ export function SettingsModal() {
   };
 
   useEffect(() => {
+    return () => {
+      if (pendingVideo?.previewUrl) {
+        URL.revokeObjectURL(pendingVideo.previewUrl);
+      }
+    };
+  }, [pendingVideo?.previewUrl]);
+
+  useEffect(() => {
     if (!isSettingsOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -277,6 +285,9 @@ export function SettingsModal() {
         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
         : `${(file.size / 1024).toFixed(0)} KB`;
 
+    if (pendingVideo?.previewUrl) {
+      URL.revokeObjectURL(pendingVideo.previewUrl);
+    }
     const previewUrl = URL.createObjectURL(file);
     setVideoErrorMessage(null);
     setPendingVideo({

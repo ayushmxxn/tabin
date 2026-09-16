@@ -104,10 +104,12 @@ const TabRow = memo(function TabRow({
           loading="lazy"
           decoding="async"
           onError={(e) => {
-            e.currentTarget.onerror = null;
+            const el = e.currentTarget;
             const fallback = getGoogleFaviconUrl(tab.url);
-            if (e.currentTarget.src !== fallback) {
-              e.currentTarget.src = fallback;
+            if (el.src !== fallback) {
+              el.src = fallback;
+            } else {
+              el.style.opacity = "0";
             }
           }}
           className="h-4 w-4 shrink-0 rounded-[3px] object-contain opacity-80"
@@ -184,6 +186,8 @@ export default function App() {
   const menuRef = useRef<HTMLDivElement>(null);
   const moveMenuRef = useRef<HTMLDivElement>(null);
   const newGroupNameInputRef = useRef<HTMLInputElement>(null);
+  const restoringGroupIdsRef = useRef<Set<string>>(new Set());
+  const restoringTabIdsRef = useRef<Set<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -400,6 +404,8 @@ export default function App() {
 
   // Restore group
   const handleRestoreGroup = async (group: SavedTabGroup) => {
+    if (restoringGroupIdsRef.current.has(group.id)) return;
+    restoringGroupIdsRef.current.add(group.id);
     try {
       setOpenMenuGroupId(null);
       const result = await restoreGroup(group.id);
@@ -410,9 +416,13 @@ export default function App() {
           } already open · focused existing`,
         );
       }
-      setGroups((prev) => prev.filter((g) => g.id !== group.id));
+      if (result.updated) {
+        setGroups(result.updated);
+      }
     } catch (err) {
       console.error("Failed to restore group:", err);
+    } finally {
+      restoringGroupIdsRef.current.delete(group.id);
     }
   };
 
@@ -426,6 +436,8 @@ export default function App() {
 
   // Restore single tab
   const handleRestoreSingleTab = useCallback(async (tab: SavedTab, groupId: string) => {
+    if (restoringTabIdsRef.current.has(tab.id)) return;
+    restoringTabIdsRef.current.add(tab.id);
     try {
       const result = await restoreTab(tab, true, groupId);
       if (result.focusedExisting) {
@@ -442,6 +454,8 @@ export default function App() {
       });
     } catch (err) {
       console.error("Failed to restore tab:", err);
+    } finally {
+      restoringTabIdsRef.current.delete(tab.id);
     }
   }, []);
 

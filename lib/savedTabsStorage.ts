@@ -690,11 +690,11 @@ export async function restoreTab(
  */
 export async function restoreGroup(
   groupId: string,
-): Promise<{ restoredCount: number; focusedExistingCount: number }> {
+): Promise<{ restoredCount: number; focusedExistingCount: number; updated: SavedTabGroup[] }> {
   const existing = await getSavedGroups();
   const group = existing.find((g) => g.id === groupId);
   if (!group || group.tabs.length === 0) {
-    return { restoredCount: 0, focusedExistingCount: 0 };
+    return { restoredCount: 0, focusedExistingCount: 0, updated: existing };
   }
 
   let restoredCount = 0;
@@ -800,11 +800,12 @@ export async function restoreGroup(
   // Partial failure safety:
   // If all tabs succeeded, delete the group entirely.
   // If only some succeeded, only remove the succeeded tabs from the group and keep the rest!
+  let updatedGroups = existing;
   if (succeededTabIds.size === group.tabs.length) {
-    await deleteGroup(groupId);
+    updatedGroups = await deleteGroup(groupId);
   } else if (succeededTabIds.size > 0) {
     const latest = await getSavedGroups();
-    const updated = latest
+    updatedGroups = latest
       .map((g) => {
         if (g.id !== groupId) return g;
         return {
@@ -813,9 +814,9 @@ export async function restoreGroup(
         };
       })
       .filter((g) => g.tabs.length > 0);
-    await persistGroups(updated);
+    await persistGroups(updatedGroups);
   }
-  return { restoredCount, focusedExistingCount };
+  return { restoredCount, focusedExistingCount, updated: updatedGroups };
 }
 
 /** Backward compatibility alias */

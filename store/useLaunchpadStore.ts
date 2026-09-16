@@ -142,6 +142,8 @@ interface LaunchpadState {
   resetToDefaults: () => void;
 }
 
+let lastWrittenStorageString: string | null = null;
+
 const dualStorageAdapter = {
   getItem: async (name: string): Promise<string | null> => {
     const backupKey = `${name}_backup`;
@@ -210,6 +212,10 @@ const dualStorageAdapter = {
     } catch {
       console.error('Refusing to persist invalid JSON:', name);
       return;
+    }
+
+    if (name === 'launchpad-storage') {
+      lastWrittenStorageString = value;
     }
 
     const backupKey = `${name}_backup`;
@@ -1057,6 +1063,10 @@ export const useLaunchpadStore = create<LaunchpadState>()(
  */
 export function syncStoreFromExternal(data: unknown) {
   if (!data) return;
+  const rawString = typeof data === 'string' ? data : JSON.stringify(data);
+  if (lastWrittenStorageString && rawString === lastWrittenStorageString) {
+    return;
+  }
   try {
     const parsed = typeof data === 'string' ? JSON.parse(data) : data;
     const incomingState = (parsed as { state?: Partial<LaunchpadState> })?.state || (parsed as Partial<LaunchpadState>);

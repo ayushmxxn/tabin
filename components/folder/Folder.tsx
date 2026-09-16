@@ -132,17 +132,19 @@ const FolderComponent = memo(({
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
             {card1Item && (
               <motion.div
-                className="absolute"
+                className="absolute pointer-events-none"
                 animate={{
-                  y: isOpen ? -150 : isHovered ? -60 : -40,
-                  x: isOpen ? 70 : 42,
-                  rotate: isOpen ? 18 : isHovered ? 14 : 10,
+                  y: isOpen ? 0 : isHovered ? -60 : -40,
+                  x: isOpen ? 0 : 42,
+                  rotate: isOpen ? 0 : isHovered ? 14 : 10,
+                  opacity: isOpen ? 0 : 1,
+                  scale: isOpen ? 0.6 : 1,
                 }}
                 transition={{
                   type: "spring",
-                  stiffness: 180,
-                  damping: 22,
-                  delay: isOpen ? 0.06 : isHovered ? 0.08 : 0,
+                  stiffness: 220,
+                  damping: 24,
+                  delay: isOpen ? 0 : isHovered ? 0.08 : 0,
                 }}
               >
                 <FolderIcon item={card1Item} />
@@ -150,17 +152,19 @@ const FolderComponent = memo(({
             )}
             {card2Item && (
               <motion.div
-                className="absolute"
+                className="absolute pointer-events-none"
                 animate={{
-                  y: isOpen ? -170 : isHovered ? -75 : -48,
+                  y: isOpen ? 0 : isHovered ? -75 : -48,
                   x: isOpen ? 0 : 2,
-                  rotate: isOpen ? -3 : isHovered ? -1 : 2,
+                  rotate: isOpen ? 0 : isHovered ? -1 : 2,
+                  opacity: isOpen ? 0 : 1,
+                  scale: isOpen ? 0.6 : 1,
                 }}
                 transition={{
                   type: "spring",
-                  stiffness: 180,
-                  damping: 22,
-                  delay: isOpen ? 0.03 : isHovered ? 0.04 : 0,
+                  stiffness: 220,
+                  damping: 24,
+                  delay: isOpen ? 0 : isHovered ? 0.04 : 0,
                 }}
               >
                 <FolderIcon item={card2Item} />
@@ -168,16 +172,18 @@ const FolderComponent = memo(({
             )}
             {card3Item && (
               <motion.div
-                className="absolute"
+                className="absolute pointer-events-none"
                 animate={{
-                  y: isOpen ? -160 : isHovered ? -65 : -42,
-                  x: isSingle ? 0 : isOpen ? -70 : -42,
-                  rotate: isSingle ? 0 : isOpen ? -14 : isHovered ? -9 : -6,
+                  y: isOpen ? 0 : isHovered ? -65 : -42,
+                  x: isOpen ? 0 : isSingle ? 0 : -42,
+                  rotate: isOpen ? 0 : isSingle ? 0 : isHovered ? -9 : -6,
+                  opacity: isOpen ? 0 : 1,
+                  scale: isOpen ? 0.6 : 1,
                 }}
                 transition={{
                   type: "spring",
-                  stiffness: 180,
-                  damping: 22,
+                  stiffness: 220,
+                  damping: 24,
                   delay: 0,
                 }}
               >
