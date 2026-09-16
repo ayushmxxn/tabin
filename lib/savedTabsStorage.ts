@@ -12,22 +12,49 @@ export async function getSavedGroups(): Promise<SavedTabGroup[]> {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
       const result = await chrome.storage.local.get(STORAGE_KEY);
       raw = result[STORAGE_KEY];
-    } else {
+    } else if (typeof localStorage !== "undefined") {
       raw = localStorage.getItem(STORAGE_KEY);
     }
 
     if (!raw) return [];
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    let parsed: unknown;
+    if (typeof raw === "string") {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        console.error("Corrupted JSON in saved tabs storage");
+        return [];
+      }
+    } else {
+      parsed = raw;
+    }
     if (!Array.isArray(parsed)) return [];
 
     return parsed
-      .map((item, index) => ({
-        id: item.id || `group-${index}`,
-        name: item.name?.trim() && item.name !== "Saved Tabs" ? item.name.trim() : "Today",
-        createdAt: item.createdAt || Date.now(),
-        tabs: Array.isArray(item.tabs) ? item.tabs : [],
-        isTarget: Boolean(item.isTarget),
-      }));
+      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+      .map((item, index) => {
+        const rawTabs = Array.isArray(item.tabs) ? item.tabs : [];
+        const validTabs: SavedTab[] = rawTabs
+          .filter((t): t is SavedTab => Boolean(t && typeof t === "object" && typeof t.url === "string" && t.url.trim()))
+          .map((t, tabIndex) => ({
+            id: typeof t.id === "string" && t.id ? t.id : `tab-${index}-${tabIndex}-${Date.now()}`,
+            url: t.url.trim(),
+            title: typeof t.title === "string" ? t.title : "Untitled Tab",
+            favIconUrl: typeof t.favIconUrl === "string" ? t.favIconUrl : null,
+            pinned: Boolean(t.pinned),
+            groupId: typeof t.groupId === "number" ? t.groupId : undefined,
+            groupTitle: typeof t.groupTitle === "string" ? t.groupTitle : undefined,
+            groupColor: typeof t.groupColor === "string" ? t.groupColor : undefined,
+          }));
+
+        return {
+          id: typeof item.id === "string" && item.id ? item.id : `group-${index}-${Date.now()}`,
+          name: typeof item.name === "string" && item.name.trim() && item.name !== "Saved Tabs" ? item.name.trim() : "Today",
+          createdAt: typeof item.createdAt === "number" ? item.createdAt : Date.now(),
+          tabs: validTabs,
+          isTarget: Boolean(item.isTarget),
+        };
+      });
   } catch (err) {
     console.error("Failed to load saved tab groups:", err);
     return [];
@@ -38,10 +65,14 @@ export async function getSavedGroups(): Promise<SavedTabGroup[]> {
 export const getSavedSessions = getSavedGroups;
 
 async function persistGroups(groups: SavedTabGroup[]): Promise<void> {
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    await chrome.storage.local.set({ [STORAGE_KEY]: groups });
-  } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
+  try {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      await chrome.storage.local.set({ [STORAGE_KEY]: groups });
+    } else if (typeof localStorage !== "undefined") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
+    }
+  } catch (err) {
+    console.error("Failed to persist saved tab groups:", err);
   }
 }
 
@@ -143,25 +174,29 @@ export async function recordDuplicateNotice(
   count: number,
   type: "saved" | "restored",
 ): Promise<void> {
-  const text =
-    type === "saved"
-      ? `${count} duplicate ${count === 1 ? "tab" : "tabs"} skipped`
-      : `${count} duplicate ${count === 1 ? "tab" : "tabs"} already open`;
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    await chrome.storage.local.set({ [NOTICE_KEY]: text });
-  }
+  try {
+    const text =
+      type === "saved"
+        ? `${count} duplicate ${count === 1 ? "tab" : "tabs"} skipped`
+        : `${count} duplicate ${count === 1 ? "tab" : "tabs"} already open`;
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      await chrome.storage.local.set({ [NOTICE_KEY]: text });
+    }
+  } catch {}
 }
 
 export async function consumeDuplicateNotice(): Promise<string | null> {
-  if (typeof chrome !== "undefined" && chrome.storage?.local) {
-    const res = await chrome.storage.local.get(NOTICE_KEY);
-    const val = res[NOTICE_KEY];
-    const notice = typeof val === "string" ? val : null;
-    if (notice) {
-      await chrome.storage.local.remove(NOTICE_KEY);
+  try {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      const res = await chrome.storage.local.get(NOTICE_KEY);
+      const val = res[NOTICE_KEY];
+      const notice = typeof val === "string" ? val : null;
+      if (notice) {
+        await chrome.storage.local.remove(NOTICE_KEY).catch(() => {});
+      }
+      return notice;
     }
-    return notice;
-  }
+  } catch {}
   return null;
 }
 
@@ -181,6 +216,10 @@ export async function saveNewTabs(
   tabs: SavedTab[],
   targetGroupId?: string | null,
 ): Promise<SaveTabsResult> {
+  if (!Array.isArray(tabs) || tabs.length === 0) {
+    return { group: null, savedCount: 0, skippedCount: 0 };
+  }
+
   const existing = await getSavedGroups();
 
   // Deduplicate within the incoming batch itself
@@ -509,6 +548,7 @@ export async function restoreTab(
   groupId?: string,
 ): Promise<{ restored: boolean; focusedExisting: boolean; updated: SavedTabGroup[] | null }> {
   let focusedExisting = false;
+  let restored = false;
 
   if (typeof chrome !== "undefined" && chrome.tabs?.query) {
     try {
@@ -526,22 +566,34 @@ export async function restoreTab(
             .catch(() => {});
         }
         focusedExisting = true;
+        restored = true;
       } else {
         await chrome.tabs.create({ url: tab.url, active: true });
+        restored = true;
       }
     } catch {
-      await chrome.tabs.create({ url: tab.url, active: true });
+      try {
+        await chrome.tabs.create({ url: tab.url, active: true });
+        restored = true;
+      } catch {
+        restored = false;
+      }
     }
   } else {
-    window.open(tab.url, "_blank", "noopener,noreferrer");
+    try {
+      window.open(tab.url, "_blank", "noopener,noreferrer");
+      restored = true;
+    } catch {
+      restored = false;
+    }
   }
 
   let updated: SavedTabGroup[] | null = null;
-  if (removeAfterRestore && groupId) {
+  if (restored && removeAfterRestore && groupId) {
     updated = await deleteTabFromGroup(groupId, tab.id);
   }
 
-  return { restored: true, focusedExisting, updated };
+  return { restored, focusedExisting, updated };
 }
 
 /**
@@ -647,12 +699,17 @@ export async function restoreGroup(
     }
   } else {
     for (const tab of group.tabs) {
-      window.open(tab.url, "_blank", "noopener,noreferrer");
-      restoredCount++;
+      try {
+        window.open(tab.url, "_blank", "noopener,noreferrer");
+        restoredCount++;
+      } catch {}
     }
   }
 
-  await deleteGroup(groupId);
+  // Only delete the group if at least one tab was successfully restored or focused
+  if (restoredCount > 0 || focusedExistingCount > 0) {
+    await deleteGroup(groupId);
+  }
   return { restoredCount, focusedExistingCount };
 }
 

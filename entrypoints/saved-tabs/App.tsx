@@ -201,6 +201,7 @@ export default function App() {
 
     if (typeof chrome !== "undefined" && chrome.tabs) {
       chrome.tabs.getCurrent?.((tab) => {
+        if (chrome.runtime?.lastError) return;
         if (tab?.id && !tab.pinned) {
           chrome.tabs.update(tab.id, { pinned: true }).catch(() => {});
         }
@@ -209,12 +210,13 @@ export default function App() {
       // Close duplicate Saved Tabs tabs across all windows
       const savedTabsPageUrl = chrome.runtime.getURL("/saved-tabs.html");
       chrome.tabs.query?.({}, (allTabs) => {
-        if (!allTabs) return;
+        if (chrome.runtime?.lastError || !allTabs) return;
         const matching = allTabs.filter(
           (t) => t.id && t.url && t.url.startsWith(savedTabsPageUrl),
         );
         if (matching.length > 1) {
           chrome.tabs.getCurrent?.((currentTab) => {
+            if (chrome.runtime?.lastError) return;
             const duplicates = matching
               .filter((t) => t.id !== currentTab?.id)
               .map((t) => t.id!)
@@ -228,12 +230,20 @@ export default function App() {
     }
 
     let mounted = true;
-    getSavedGroups().then((data) => {
-      if (mounted) {
-        setGroups(data);
-        setLoading(false);
-      }
-    });
+    getSavedGroups()
+      .then((data) => {
+        if (mounted) {
+          setGroups(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to load saved groups:", err);
+        if (mounted) {
+          setGroups([]);
+          setLoading(false);
+        }
+      });
 
     consumeDuplicateNotice().then((msg) => {
       if (msg && mounted) {

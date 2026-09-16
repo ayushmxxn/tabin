@@ -144,21 +144,38 @@ interface LaunchpadState {
 
 const dualStorageAdapter = {
   getItem: async (name: string): Promise<string | null> => {
+    const isValidJson = (val: unknown): boolean => {
+      if (typeof val !== 'string') return false;
+      try {
+        const parsed = JSON.parse(val);
+        return parsed !== null && typeof parsed === 'object';
+      } catch {
+        return false;
+      }
+    };
+
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
         const result = await chrome.storage.local.get(name);
         if (result && result[name]) {
-          return typeof result[name] === 'string' ? result[name] : JSON.stringify(result[name]);
+          const raw = result[name];
+          if (typeof raw === 'string') {
+            if (isValidJson(raw)) return raw;
+          } else if (typeof raw === 'object') {
+            return JSON.stringify(raw);
+          }
         }
       } catch {}
     }
     if (typeof localStorage !== 'undefined') {
       try {
         const localVal = localStorage.getItem(name);
-        if (localVal && typeof chrome !== 'undefined' && chrome.storage?.local) {
-          chrome.storage.local.set({ [name]: localVal }).catch(() => {});
+        if (localVal && isValidJson(localVal)) {
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({ [name]: localVal }).catch(() => {});
+          }
+          return localVal;
         }
-        return localVal;
       } catch {}
     }
     return null;
@@ -827,13 +844,32 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
       restoreBackup: (backup) => {
         if (!backup || !Array.isArray(backup.items)) return false;
+        const validItems = backup.items.filter((item): item is LaunchpadItem => {
+          if (!item || typeof item !== 'object' || !item.id || typeof item.id !== 'string') return false;
+          if (item.type === 'shortcut') {
+            return typeof (item as ShortcutItem).url === 'string';
+          }
+          if (item.type === 'folder') {
+            return Array.isArray((item as FolderItem).itemIds);
+          }
+          return false;
+        });
+
+        if (validItems.length === 0 && backup.items.length > 0) {
+          return false;
+        }
+
+        const validDockIds = Array.isArray(backup.dockIds)
+          ? backup.dockIds.filter((id): id is string => typeof id === 'string')
+          : undefined;
+
         set((state) => ({
-          items: backup.items,
-          dockIds: Array.isArray(backup.dockIds) ? backup.dockIds : state.dockIds,
-          settings: backup.settings
+          items: validItems,
+          dockIds: validDockIds ?? state.dockIds,
+          settings: backup.settings && typeof backup.settings === 'object'
             ? { ...state.settings, ...(backup.settings as Partial<LaunchpadSettings>) }
             : state.settings,
-          wallpaper: backup.wallpaper
+          wallpaper: backup.wallpaper && typeof backup.wallpaper === 'object'
             ? { ...state.wallpaper, ...(backup.wallpaper as Partial<WallpaperConfig>) }
             : state.wallpaper,
         }));
@@ -926,6 +962,7 @@ export function syncStoreFromExternal(data: unknown) {
         dockIds: incomingState.dockIds ?? current.dockIds,
         spaces: incomingState.spaces ?? current.spaces,
         settings: incomingState.settings ? { ...current.settings, ...incomingState.settings } : current.settings,
+        wallpaper: incomingState.wallpaper ? { ...current.wallpaper, ...incomingState.wallpaper } : current.wallpaper,
       }));
     }
   } catch (err) {

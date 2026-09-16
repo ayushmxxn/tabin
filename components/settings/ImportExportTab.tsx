@@ -248,6 +248,10 @@ export function ImportExportTab() {
       }
       chrome.bookmarks.getTree((tree) => {
         setIsChromeLoading(false);
+        if (chrome.runtime?.lastError) {
+          showToast(false, 'Could not access Chrome bookmarks.');
+          return;
+        }
         if (!tree?.length) { showToast(false, 'No bookmarks found.'); return; }
         const result = processImportSource(tree, items, 'chrome.json', 'chrome');
         if (result.totalCount === 0) { showToast(false, 'No bookmarks found.'); return; }
@@ -271,9 +275,13 @@ export function ImportExportTab() {
     setIsImporting(true);
     try {
       if (confirmState.isBackup && confirmState.parseResult.rawTabinBackup) {
-        restoreBackup(confirmState.parseResult.rawTabinBackup as any);
-        const count = confirmState.parseResult.rawTabinBackup.items.length;
-        showToast(true, `Workspace restored — ${count} items.`);
+        const success = restoreBackup(confirmState.parseResult.rawTabinBackup as any);
+        if (success) {
+          const count = confirmState.parseResult.rawTabinBackup.items.length;
+          showToast(true, `Workspace restored — ${count} items.`);
+        } else {
+          showToast(false, 'Failed to restore workspace. Invalid backup data.');
+        }
       } else {
         const { importedShortcuts, importedFolders } = importBookmarksBatch(
           confirmState.parseResult.items,
