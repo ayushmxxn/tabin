@@ -1,60 +1,113 @@
 import type { SavedTab, SavedTabGroup } from "@/types/savedTabs";
 
 const STORAGE_KEY = "tabin-saved-tabs";
+const BACKUP_STORAGE_KEY = "tabin-saved-tabs-backup";
+
+function parseRawGroups(raw: unknown): SavedTabGroup[] | null {
+  if (!raw) return null;
+  let parsed: unknown;
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  } else {
+    parsed = raw;
+  }
+  if (!Array.isArray(parsed)) return null;
+
+  return parsed
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+    .map((item, index) => {
+      const rawTabs = Array.isArray(item.tabs) ? item.tabs : [];
+      const seenTabIds = new Set<string>();
+      const validTabs: SavedTab[] = [];
+
+      for (let tabIndex = 0; tabIndex < rawTabs.length; tabIndex++) {
+        const t = rawTabs[tabIndex];
+        if (!t || typeof t !== "object" || typeof t.url !== "string" || !t.url.trim()) {
+          continue;
+        }
+        const tabId = typeof t.id === "string" && t.id ? t.id : `tab-${index}-${tabIndex}-${Date.now()}`;
+        if (seenTabIds.has(tabId)) continue;
+        seenTabIds.add(tabId);
+
+        validTabs.push({
+          id: tabId,
+          url: t.url.trim(),
+          title: typeof t.title === "string" ? t.title : "Untitled Tab",
+          favIconUrl: typeof t.favIconUrl === "string" ? t.favIconUrl : null,
+          pinned: Boolean(t.pinned),
+          groupId: typeof t.groupId === "number" ? t.groupId : undefined,
+          groupTitle: typeof t.groupTitle === "string" ? t.groupTitle : undefined,
+          groupColor: typeof t.groupColor === "string" ? t.groupColor : undefined,
+        });
+      }
+
+      return {
+        id: typeof item.id === "string" && item.id ? item.id : `group-${index}-${Date.now()}`,
+        name: typeof item.name === "string" && item.name.trim() && item.name !== "Saved Tabs" ? item.name.trim() : "Today",
+        createdAt: typeof item.createdAt === "number" ? item.createdAt : Date.now(),
+        tabs: validTabs,
+        isTarget: Boolean(item.isTarget),
+      };
+    });
+}
 
 /**
- * Retrieves all saved tab groups from storage.
- * Normalizes legacy sessions into SavedTabGroup.
+ * Retrieves all saved tab groups from storage with multi-level recovery:
+ * 1. Primary chrome.storage.local
+ * 2. Backup chrome.storage.local snapshot
+ * 3. Primary localStorage mirror
+ * 4. Backup localStorage mirror
+ * Automatically self-heals corrupted storage from the last known-good backup.
  */
 export async function getSavedGroups(): Promise<SavedTabGroup[]> {
   try {
-    let raw: unknown = null;
+    let primaryRaw: unknown = null;
+    let backupRaw: unknown = null;
+
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      const result = await chrome.storage.local.get(STORAGE_KEY);
-      raw = result[STORAGE_KEY];
-    } else if (typeof localStorage !== "undefined") {
-      raw = localStorage.getItem(STORAGE_KEY);
-    }
-
-    if (!raw) return [];
-    let parsed: unknown;
-    if (typeof raw === "string") {
       try {
-        parsed = JSON.parse(raw);
-      } catch {
-        console.error("Corrupted JSON in saved tabs storage");
-        return [];
+        const result = await chrome.storage.local.get([STORAGE_KEY, BACKUP_STORAGE_KEY]);
+        primaryRaw = result[STORAGE_KEY];
+        backupRaw = result[BACKUP_STORAGE_KEY];
+      } catch (err) {
+        console.warn("Error reading from chrome.storage.local:", err);
       }
-    } else {
-      parsed = raw;
     }
-    if (!Array.isArray(parsed)) return [];
 
-    return parsed
-      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
-      .map((item, index) => {
-        const rawTabs = Array.isArray(item.tabs) ? item.tabs : [];
-        const validTabs: SavedTab[] = rawTabs
-          .filter((t): t is SavedTab => Boolean(t && typeof t === "object" && typeof t.url === "string" && t.url.trim()))
-          .map((t, tabIndex) => ({
-            id: typeof t.id === "string" && t.id ? t.id : `tab-${index}-${tabIndex}-${Date.now()}`,
-            url: t.url.trim(),
-            title: typeof t.title === "string" ? t.title : "Untitled Tab",
-            favIconUrl: typeof t.favIconUrl === "string" ? t.favIconUrl : null,
-            pinned: Boolean(t.pinned),
-            groupId: typeof t.groupId === "number" ? t.groupId : undefined,
-            groupTitle: typeof t.groupTitle === "string" ? t.groupTitle : undefined,
-            groupColor: typeof t.groupColor === "string" ? t.groupColor : undefined,
-          }));
+    let groups = parseRawGroups(primaryRaw);
 
-        return {
-          id: typeof item.id === "string" && item.id ? item.id : `group-${index}-${Date.now()}`,
-          name: typeof item.name === "string" && item.name.trim() && item.name !== "Saved Tabs" ? item.name.trim() : "Today",
-          createdAt: typeof item.createdAt === "number" ? item.createdAt : Date.now(),
-          tabs: validTabs,
-          isTarget: Boolean(item.isTarget),
-        };
-      });
+    // If primary was corrupted or missing, try chrome.storage backup
+    if (!groups && backupRaw) {
+      groups = parseRawGroups(backupRaw);
+      if (groups) {
+        // Self-heal primary storage
+        persistGroups(groups).catch(() => {});
+      }
+    }
+
+    // Fall back to localStorage mirror if still missing or corrupted
+    if (!groups && typeof localStorage !== "undefined") {
+      try {
+        const localPrimary = localStorage.getItem(STORAGE_KEY);
+        groups = parseRawGroups(localPrimary);
+        if (!groups) {
+          const localBackup = localStorage.getItem(BACKUP_STORAGE_KEY);
+          groups = parseRawGroups(localBackup);
+        }
+        if (groups) {
+          // Self-heal chrome.storage from localStorage mirror
+          persistGroups(groups).catch(() => {});
+        }
+      } catch (err) {
+        console.warn("Error reading from localStorage:", err);
+      }
+    }
+
+    return groups ?? [];
   } catch (err) {
     console.error("Failed to load saved tab groups:", err);
     return [];
@@ -65,14 +118,43 @@ export async function getSavedGroups(): Promise<SavedTabGroup[]> {
 export const getSavedSessions = getSavedGroups;
 
 async function persistGroups(groups: SavedTabGroup[]): Promise<void> {
+  if (!Array.isArray(groups)) {
+    console.error("Refusing to persist non-array saved tab groups");
+    return;
+  }
+
+  // Sanitize groups before committing
+  const sanitized: SavedTabGroup[] = groups
+    .filter((g) => Boolean(g && typeof g === "object" && typeof g.id === "string"))
+    .map((g) => ({
+      id: g.id,
+      name: (typeof g.name === "string" && g.name.trim()) || "Today",
+      createdAt: typeof g.createdAt === "number" ? g.createdAt : Date.now(),
+      tabs: Array.isArray(g.tabs)
+        ? g.tabs.filter((t) => Boolean(t && typeof t === "object" && typeof t.url === "string" && t.url.trim()))
+        : [],
+      isTarget: Boolean(g.isTarget),
+    }));
+
   try {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
-      await chrome.storage.local.set({ [STORAGE_KEY]: groups });
-    } else if (typeof localStorage !== "undefined") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(groups));
+      await chrome.storage.local.set({
+        [STORAGE_KEY]: sanitized,
+        [BACKUP_STORAGE_KEY]: sanitized,
+      });
     }
   } catch (err) {
-    console.error("Failed to persist saved tab groups:", err);
+    console.error("Failed to persist saved tab groups to chrome.storage.local:", err);
+  }
+
+  try {
+    if (typeof localStorage !== "undefined") {
+      const jsonStr = JSON.stringify(sanitized);
+      localStorage.setItem(STORAGE_KEY, jsonStr);
+      localStorage.setItem(BACKUP_STORAGE_KEY, jsonStr);
+    }
+  } catch (err) {
+    console.error("Failed to persist saved tab groups to localStorage:", err);
   }
 }
 
@@ -326,11 +408,13 @@ export async function createGroupWithTabs(
   if (tabIds.length === 0) return null;
   const existing = await getSavedGroups();
   const idSet = new Set(tabIds);
+  const seenMoveIds = new Set<string>();
   const tabsToMove: SavedTab[] = [];
 
   for (const group of existing) {
     for (const tab of group.tabs) {
-      if (idSet.has(tab.id)) {
+      if (idSet.has(tab.id) && !seenMoveIds.has(tab.id)) {
+        seenMoveIds.add(tab.id);
         tabsToMove.push(tab);
       }
     }
@@ -466,11 +550,13 @@ export async function moveMultipleTabsToGroup(
   if (!targetGroup) return existing;
 
   const idSet = new Set(tabIds);
+  const seenMoveIds = new Set<string>();
   const tabsToMove: SavedTab[] = [];
 
   for (const group of existing) {
     for (const tab of group.tabs) {
-      if (idSet.has(tab.id)) {
+      if (idSet.has(tab.id) && !seenMoveIds.has(tab.id)) {
+        seenMoveIds.add(tab.id);
         tabsToMove.push(tab);
       }
     }
@@ -600,6 +686,7 @@ export async function restoreTab(
  * Restores all tabs in a group.
  * Recreates Chrome Tab Groups if group metadata is present.
  * If a tab is already open, focuses it instead of opening a duplicate.
+ * Preserves partially failed tabs so user data is never lost.
  */
 export async function restoreGroup(
   groupId: string,
@@ -612,6 +699,7 @@ export async function restoreGroup(
 
   let restoredCount = 0;
   let focusedExistingCount = 0;
+  const succeededTabIds = new Set<string>();
 
   if (typeof chrome !== "undefined" && chrome.tabs?.create) {
     const openTabs = (await chrome.tabs.query({})) || [];
@@ -636,6 +724,7 @@ export async function restoreGroup(
 
         if (existingOpen && existingOpen.id) {
           focusedExistingCount++;
+          succeededTabIds.add(tab.id);
           if (!firstFocusedTab) {
             firstFocusedTab = existingOpen;
           }
@@ -648,6 +737,7 @@ export async function restoreGroup(
 
           if (createdTab.id) {
             restoredCount++;
+            succeededTabIds.add(tab.id);
             openUrlMap.set(norm, createdTab);
 
             if (tab.groupId && tab.groupId !== -1) {
@@ -702,13 +792,28 @@ export async function restoreGroup(
       try {
         window.open(tab.url, "_blank", "noopener,noreferrer");
         restoredCount++;
+        succeededTabIds.add(tab.id);
       } catch {}
     }
   }
 
-  // Only delete the group if at least one tab was successfully restored or focused
-  if (restoredCount > 0 || focusedExistingCount > 0) {
+  // Partial failure safety:
+  // If all tabs succeeded, delete the group entirely.
+  // If only some succeeded, only remove the succeeded tabs from the group and keep the rest!
+  if (succeededTabIds.size === group.tabs.length) {
     await deleteGroup(groupId);
+  } else if (succeededTabIds.size > 0) {
+    const latest = await getSavedGroups();
+    const updated = latest
+      .map((g) => {
+        if (g.id !== groupId) return g;
+        return {
+          ...g,
+          tabs: g.tabs.filter((t) => !succeededTabIds.has(t.id)),
+        };
+      })
+      .filter((g) => g.tabs.length > 0);
+    await persistGroups(updated);
   }
   return { restoredCount, focusedExistingCount };
 }

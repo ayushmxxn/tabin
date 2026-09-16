@@ -36,7 +36,9 @@ export function exportToHtml(items: LaunchpadItem[]): string {
     items.filter((item): item is FolderItem => item.type === 'folder').map((f) => [f.id, f]),
   );
 
-  function renderFolder(folder: FolderItem, indent: string): string {
+  function renderFolder(folder: FolderItem, indent: string, visited = new Set<string>()): string {
+    if (visited.has(folder.id)) return '';
+    visited.add(folder.id);
     let out = `${indent}<DT><H3 ADD_DATE="${now}" LAST_MODIFIED="${now}">${escapeHtml(folder.title)}</H3>\n`;
     out += `${indent}<DL><p>\n`;
     for (const childId of folder.itemIds) {
@@ -45,8 +47,8 @@ export function exportToHtml(items: LaunchpadItem[]): string {
         out += `${indent}    <DT><A HREF="${escapeHtml(childShortcut.url)}" ADD_DATE="${now}">${escapeHtml(childShortcut.title)}</A>\n`;
       } else {
         const childFolder = foldersMap.get(childId);
-        if (childFolder) {
-          out += renderFolder(childFolder, `${indent}    `);
+        if (childFolder && !visited.has(childFolder.id)) {
+          out += renderFolder(childFolder, `${indent}    `, visited);
         }
       }
     }

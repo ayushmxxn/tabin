@@ -144,6 +144,7 @@ interface LaunchpadState {
 
 const dualStorageAdapter = {
   getItem: async (name: string): Promise<string | null> => {
+    const backupKey = `${name}_backup`;
     const isValidJson = (val: unknown): boolean => {
       if (typeof val !== 'string') return false;
       try {
@@ -154,53 +155,93 @@ const dualStorageAdapter = {
       }
     };
 
+    // 1. Try primary chrome.storage.local
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
-        const result = await chrome.storage.local.get(name);
+        const result = await chrome.storage.local.get([name, backupKey]);
         if (result && result[name]) {
           const raw = result[name];
-          if (typeof raw === 'string') {
-            if (isValidJson(raw)) return raw;
+          if (typeof raw === 'string' && isValidJson(raw)) {
+            return raw;
           } else if (typeof raw === 'object') {
             return JSON.stringify(raw);
           }
         }
+        // If primary corrupted or missing, try chrome.storage backup snapshot
+        if (result && result[backupKey]) {
+          const rawBackup = result[backupKey];
+          if (typeof rawBackup === 'string' && isValidJson(rawBackup)) {
+            chrome.storage.local.set({ [name]: rawBackup }).catch(() => {});
+            return rawBackup;
+          } else if (typeof rawBackup === 'object') {
+            const str = JSON.stringify(rawBackup);
+            chrome.storage.local.set({ [name]: str }).catch(() => {});
+            return str;
+          }
+        }
       } catch {}
     }
+
+    // 2. Try localStorage mirror
     if (typeof localStorage !== 'undefined') {
       try {
         const localVal = localStorage.getItem(name);
         if (localVal && isValidJson(localVal)) {
           if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.set({ [name]: localVal }).catch(() => {});
+            chrome.storage.local.set({ [name]: localVal, [backupKey]: localVal }).catch(() => {});
           }
           return localVal;
+        }
+        const localBackup = localStorage.getItem(backupKey);
+        if (localBackup && isValidJson(localBackup)) {
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({ [name]: localBackup, [backupKey]: localBackup }).catch(() => {});
+          }
+          return localBackup;
         }
       } catch {}
     }
     return null;
   },
   setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      const parsed = JSON.parse(value);
+      if (!parsed || typeof parsed !== 'object') return;
+    } catch {
+      console.error('Refusing to persist invalid JSON:', name);
+      return;
+    }
+
+    const backupKey = `${name}_backup`;
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      try {
+        await chrome.storage.local.set({ [name]: value, [backupKey]: value });
+      } catch (err) {
+        console.warn('Failed to write to chrome.storage.local:', err);
+      }
+    }
+
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.setItem(name, value);
-      } catch {}
-    }
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      try {
-        await chrome.storage.local.set({ [name]: value });
-      } catch {}
+        localStorage.setItem(backupKey, value);
+      } catch (err) {
+        console.warn('Failed to write to localStorage:', err);
+      }
     }
   },
   removeItem: async (name: string): Promise<void> => {
+    const backupKey = `${name}_backup`;
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.removeItem(name);
+        localStorage.removeItem(backupKey);
       } catch {}
     }
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
-        await chrome.storage.local.remove(name);
+        await chrome.storage.local.remove([name, backupKey]);
       } catch {}
     }
   },
@@ -815,6 +856,28 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           }
         }
 
+        // Snapshot current state before batch import to preserve last known good state
+        const currentState = get();
+        try {
+          const snapshot = JSON.stringify({
+            items: currentState.items,
+            dockIds: currentState.dockIds,
+            timestamp: Date.now(),
+          });
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({ 'tabin-pre-import-snapshot': snapshot }).catch(() => {});
+          }
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('tabin-pre-import-snapshot', snapshot);
+          }
+        } catch {}
+
+        // Ensure newly created folders/shortcuts do not duplicate any IDs
+        const existingIds = new Set(items.map((i) => i.id));
+        const safeNewFolders = newFolders.filter((f) => !existingIds.has(f.id));
+        safeNewFolders.forEach((f) => existingIds.add(f.id));
+        const safeNewShortcuts = newShortcuts.filter((s) => !existingIds.has(s.id));
+
         let updatedItems = items.map((item) => {
           if (item.type === 'folder' && modifiedExistingFolders.has(item.id)) {
             return modifiedExistingFolders.get(item.id)!;
@@ -822,7 +885,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           return item;
         });
 
-        updatedItems = [...updatedItems, ...newFolders, ...newShortcuts];
+        updatedItems = [...updatedItems, ...safeNewFolders, ...safeNewShortcuts];
 
         const updatedDockIds = [...dockIds];
         for (const rid of newRootDockIds) {
@@ -837,13 +900,15 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         });
 
         return {
-          importedShortcuts: newShortcuts.length,
-          importedFolders: newFolders.length,
+          importedShortcuts: safeNewShortcuts.length,
+          importedFolders: safeNewFolders.length,
         };
       },
 
       restoreBackup: (backup) => {
         if (!backup || !Array.isArray(backup.items)) return false;
+
+        // 1. Sanitize items
         const validItems = backup.items.filter((item): item is LaunchpadItem => {
           if (!item || typeof item !== 'object' || !item.id || typeof item.id !== 'string') return false;
           if (item.type === 'shortcut') {
@@ -859,12 +924,52 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           return false;
         }
 
+        // 2. Deduplicate items by ID
+        const seenIds = new Set<string>();
+        const deduplicatedItems: LaunchpadItem[] = [];
+        for (const item of validItems) {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            deduplicatedItems.push(item);
+          }
+        }
+
+        // 3. Clean dangling child IDs from folders & prevent self-cycles
+        const sanitizedItems = deduplicatedItems.map((item) => {
+          if (item.type === 'folder') {
+            return {
+              ...item,
+              itemIds: item.itemIds.filter((cid) => seenIds.has(cid) && cid !== item.id),
+            };
+          }
+          return item;
+        });
+
+        // 4. Sanitize dockIds to only reference existing items
         const validDockIds = Array.isArray(backup.dockIds)
-          ? backup.dockIds.filter((id): id is string => typeof id === 'string')
+          ? backup.dockIds.filter((id): id is string => typeof id === 'string' && seenIds.has(id))
           : undefined;
 
+        // 5. Pre-restore safety snapshot of current state
+        const currentState = get();
+        try {
+          const snapshot = JSON.stringify({
+            items: currentState.items,
+            dockIds: currentState.dockIds,
+            settings: currentState.settings,
+            wallpaper: currentState.wallpaper,
+            timestamp: Date.now(),
+          });
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({ 'tabin-pre-restore-snapshot': snapshot }).catch(() => {});
+          }
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('tabin-pre-restore-snapshot', snapshot);
+          }
+        } catch {}
+
         set((state) => ({
-          items: validItems,
+          items: sanitizedItems,
           dockIds: validDockIds ?? state.dockIds,
           settings: backup.settings && typeof backup.settings === 'object'
             ? { ...state.settings, ...(backup.settings as Partial<LaunchpadSettings>) }

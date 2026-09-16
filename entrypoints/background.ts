@@ -431,12 +431,22 @@ export default defineBackground(() => {
       items: updatedItems,
     };
 
-    const containerObj = typeof raw === "string" ? JSON.parse(raw) : raw || {};
-    containerObj.state = updatedState;
+    const containerObj =
+      typeof raw === "string"
+        ? JSON.parse(raw)
+        : raw && typeof raw === "object"
+          ? raw
+          : {};
 
+    containerObj.state = {
+      ...(containerObj.state || {}),
+      ...updatedState,
+    };
+
+    const serialized = JSON.stringify(containerObj);
     await chrome.storage.local.set({
-      "launchpad-storage":
-        typeof raw === "string" ? JSON.stringify(containerObj) : containerObj,
+      "launchpad-storage": serialized,
+      "launchpad-storage_backup": serialized,
     });
 
     // Show fast, native, minimal confirmation
