@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import type { RefObject } from 'react';
-import { useMotionValue, type PanInfo } from 'motion/react';
+import { animate, useMotionValue, type PanInfo } from 'motion/react';
+import { useLaunchpadStore } from '@/store/useLaunchpadStore';
 
-import { snapToGridRhythm } from '@/lib/layout';
+import { GRID_CONFIG } from '@/lib/layout';
 
 // Pointer must move more than this (in px) before a drag "counts" —
 // keeps an ordinary click from being swallowed by the drag gesture.
@@ -12,7 +13,9 @@ interface UseCanvasDragOptions {
   id: string;
   canvasRef: RefObject<HTMLDivElement | null>;
   columns?: number;
-  onMove: (position: { x: number; y: number }) => void;
+  pageOffset?: number;
+  onMove?: (position: { x: number; y: number }) => void;
+  onReorder?: (targetIndex: number) => void;
   onActivate: () => void;
 }
 
@@ -29,19 +32,88 @@ interface UseCanvasDragOptions {
  * stacked on top of the new left/top forever, so every subsequent drag
  * would start further off than it looks.
  */
-export function useCanvasDrag({ id, canvasRef, columns, onMove, onActivate }: UseCanvasDragOptions) {
+function getDistanceToRect(px: number, py: number, rect: DOMRect) {
+  const dx = Math.max(rect.left - px, 0, px - rect.right);
+  const dy = Math.max(rect.top - py, 0, py - rect.bottom);
+  return Math.hypot(dx, dy);
+}
+
+function findNearbyDockTarget(pointX: number, pointY: number) {
+  const PROXIMITY_THRESHOLD = 55; // px radius around target
+
+  const folderEls = Array.from(document.querySelectorAll<HTMLElement>('[data-dock-folder-id]'));
+  let bestTarget: { type: 'folder'; id: string; el: HTMLElement } | { type: 'home'; el: HTMLElement } | null = null;
+  let minDistance = Infinity;
+
+  for (const el of folderEls) {
+    const rect = el.getBoundingClientRect();
+    const distance = getDistanceToRect(pointX, pointY, rect);
+    if (distance <= PROXIMITY_THRESHOLD && distance < minDistance) {
+      const folderId = el.getAttribute('data-dock-folder-id');
+      if (folderId) {
+        minDistance = distance;
+        bestTarget = { type: 'folder', id: folderId, el };
+      }
+    }
+  }
+
+  const homeEl = document.querySelector<HTMLElement>('[data-dock-home]');
+  if (homeEl) {
+    const rect = homeEl.getBoundingClientRect();
+    const distance = getDistanceToRect(pointX, pointY, rect);
+    if (distance <= PROXIMITY_THRESHOLD && distance < minDistance) {
+      bestTarget = { type: 'home', el: homeEl };
+    }
+  }
+
+  return bestTarget;
+}
+
+export function useCanvasDrag({ id, canvasRef, columns, pageOffset, onMove, onReorder, onActivate }: UseCanvasDragOptions) {
   const dragDistance = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
+
+  useEffect(() => {
+    if (isDragging) {
+      const prevCursor = document.body.style.cursor;
+      document.body.style.cursor = 'grabbing';
+      return () => {
+        document.body.style.cursor = prevCursor;
+      };
+    }
+  }, [isDragging]);
 
   const dragHandlers = {
     onDragStart: () => {
       dragDistance.current = 0;
+      setIsDragging(true);
     },
     onDrag: (_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
       dragDistance.current = Math.hypot(info.offset.x, info.offset.y);
+
+      if (dragDistance.current >= DRAG_THRESHOLD) {
+        const tileEl = document.querySelector<HTMLElement>(`[data-tile-id="${id}"]`);
+        let centerX = info.point.x;
+        let centerY = info.point.y;
+        if (tileEl) {
+          const tileRect = tileEl.getBoundingClientRect();
+          centerX = tileRect.left + tileRect.width / 2;
+          centerY = tileRect.top + tileRect.height / 2;
+        }
+
+        const target = findNearbyDockTarget(info.point.x, info.point.y) ?? findNearbyDockTarget(centerX, centerY);
+        const nextFolderId = target && target.type === 'folder' ? target.id : null;
+        if (useLaunchpadStore.getState().dragOverFolderId !== nextFolderId) {
+          useLaunchpadStore.getState().setDragOverFolderId(nextFolderId);
+        }
+      }
     },
-    onDragEnd: () => {
+    onDragEnd: (_: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+      setIsDragging(false);
+      useLaunchpadStore.getState().setDragOverFolderId(null);
+
       const canvas = canvasRef.current;
       const wasDrag = canvas && dragDistance.current >= DRAG_THRESHOLD;
 
@@ -53,18 +125,43 @@ export function useCanvasDrag({ id, canvasRef, columns, onMove, onActivate }: Us
           const centerX = tileRect.left + tileRect.width / 2;
           const centerY = tileRect.top + tileRect.height / 2;
 
-          const nextX = Math.min(Math.max((centerX - canvasRect.left) / canvasRect.width, 0.03), 0.97);
-          const nextY = Math.min(Math.max((centerY - canvasRect.top) / canvasRect.height, 0.05), 0.92);
-          const finalPos = columns ? snapToGridRhythm({ x: nextX, y: nextY }, columns) : { x: nextX, y: nextY };
-          onMove(finalPos);
+          // Check proximity to dock folder or home button (using both cursor and tile center)
+          const target = findNearbyDockTarget(info.point.x, info.point.y) ?? findNearbyDockTarget(centerX, centerY);
+          if (target) {
+            if (target.type === 'folder') {
+              useLaunchpadStore.getState().moveToFolder(id, target.id);
+            } else if (target.type === 'home') {
+              useLaunchpadStore.getState().moveToFolder(id, null);
+            }
+            animate(x, 0, { type: 'spring', stiffness: 350, damping: 28 });
+            animate(y, 0, { type: 'spring', stiffness: 350, damping: 28 });
+            return;
+          }
+
+          if (columns && onReorder) {
+            const relX = centerX - canvasRect.left;
+            const relY = centerY - canvasRect.top;
+            const colWidth = canvasRect.width / columns;
+            const startYPx = canvasRect.height * GRID_CONFIG.startY;
+            const rowHeight = canvasRect.height * GRID_CONFIG.rowStep;
+
+            const col = Math.min(Math.max(Math.floor(relX / colWidth), 0), columns - 1);
+            const row = Math.max(0, Math.round((relY - startYPx) / rowHeight));
+            const slotOnPage = row * columns + col;
+            const targetIndex = (pageOffset ?? 0) + slotOnPage;
+
+            onReorder(targetIndex);
+          } else if (onMove) {
+            const nextX = Math.min(Math.max((centerX - canvasRect.left) / canvasRect.width, 0.03), 0.97);
+            const nextY = Math.min(Math.max((centerY - canvasRect.top) / canvasRect.height, 0.05), 0.92);
+            onMove({ x: nextX, y: nextY });
+          }
         }
       }
 
-      // Always zero the offset back out — the wrapper's left/top now
-      // encodes the position (updated or unchanged), so the drag
-      // transform's job is done.
-      x.set(0);
-      y.set(0);
+      // Smoothly spring offset back to 0
+      animate(x, 0, { type: 'spring', stiffness: 350, damping: 28 });
+      animate(y, 0, { type: 'spring', stiffness: 350, damping: 28 });
     },
   };
 
@@ -73,5 +170,5 @@ export function useCanvasDrag({ id, canvasRef, columns, onMove, onActivate }: Us
     onActivate();
   };
 
-  return { dragHandlers, handleActivate, x, y };
+  return { dragHandlers, handleActivate, isDragging, x, y };
 }

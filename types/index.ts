@@ -29,12 +29,16 @@ export interface BaseItem {
 export interface ShortcutItem extends BaseItem {
   type: 'shortcut';
   url: string;
+  /** Optional custom uploaded favicon data URL or image URL */
+  customIcon?: string | null;
 }
 
 export interface FolderItem extends BaseItem {
   type: 'folder';
   /** Ordered ids of the shortcuts nested inside this folder. */
   itemIds: string[];
+  /** Custom folder color (hex code or preset id). Defaults to blue (#50B1FD). */
+  color?: string;
 }
 
 export type LaunchpadItem = ShortcutItem | FolderItem;
@@ -64,9 +68,10 @@ export interface PresetWallpaper {
 }
 
 export interface WallpaperConfig {
-  type: 'preset' | 'custom';
+  type: 'preset' | 'custom' | 'video';
   presetId: string;
   customDataUrl?: string;
+  videoFileName?: string;
   blur: number; // in pixels (0 - 30)
   darkness: number; // fraction (0 - 0.7)
 }

@@ -1,25 +1,153 @@
-import { useState, useRef } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
-import { PRESET_WALLPAPERS } from '@/data/wallpapers';
-import { useLaunchpadStore } from '@/store/useLaunchpadStore';
-import { getFaviconUrl, getHostname } from '@/lib/utils';
-import type { GridColumnsMode } from '@/types';
+import { PRESET_WALLPAPERS } from "@/data/wallpapers";
+import { getFaviconUrl, getHostname } from "@/lib/utils";
+import { useLaunchpadStore } from "@/store/useLaunchpadStore";
+import type { GridColumnsMode } from "@/types";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ImportExportTab } from "./ImportExportTab";
+import { PrivacyTab } from "./PrivacyTab";
+import { AboutTab } from "./AboutTab";
+import { saveLiveWallpaperBlob } from "@/lib/videoStorage";
 
-type SettingsTabId = 'wallpaper' | 'appearance' | 'layout' | 'dock' | 'shortcuts' | 'general';
+type SettingsTabId =
+  | "wallpaper"
+  | "layout"
+  | "shortcuts"
+  | "backup"
+  | "privacy"
+  | "about";
 
 interface TabItem {
   id: SettingsTabId;
   label: string;
-  icon: string;
+  icon: (isActive: boolean) => ReactNode;
 }
 
 const TABS: TabItem[] = [
-  { id: 'wallpaper', label: 'Wallpaper', icon: '🖼️' },
-  { id: 'appearance', label: 'Appearance', icon: '🎨' },
-  { id: 'layout', label: 'Layout', icon: '📐' },
-  { id: 'dock', label: 'Dock', icon: '⚓' },
-  { id: 'shortcuts', label: 'Shortcuts', icon: '🔗' },
-  { id: 'general', label: 'General', icon: '⚙️' },
+  {
+    id: "wallpaper",
+    label: "Wallpaper",
+    icon: (isActive) => (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={isActive ? "text-[#FA1E76]" : "text-white/45"}
+      >
+        <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+        <circle cx="9" cy="9" r="2" />
+        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+      </svg>
+    ),
+  },
+  {
+    id: "layout",
+    label: "Layout",
+    icon: (isActive) => (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={isActive ? "text-[#FA1E76]" : "text-white/45"}
+      >
+        <rect width="7" height="7" x="3" y="3" rx="1.5" />
+        <rect width="7" height="7" x="14" y="3" rx="1.5" />
+        <rect width="7" height="7" x="14" y="14" rx="1.5" />
+        <rect width="7" height="7" x="3" y="14" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
+    id: "shortcuts",
+    label: "Shortcuts",
+    icon: (isActive) => (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={isActive ? "text-[#FA1E76]" : "text-white/45"}
+      >
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+      </svg>
+    ),
+  },
+  {
+    id: "backup",
+    label: "Import & Export",
+    icon: (isActive) => (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={isActive ? "text-[#FA1E76]" : "text-white/45"}
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="17 8 12 3 7 8" />
+        <line x1="12" x2="12" y1="3" y2="15" />
+      </svg>
+    ),
+  },
+  {
+    id: "privacy",
+    label: "Privacy",
+    icon: (isActive) => (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={isActive ? "text-[#FA1E76]" : "text-white/45"}
+      >
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+  },
+  {
+    id: "about",
+    label: "About",
+    icon: (isActive) => (
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={isActive ? "text-[#FA1E76]" : "text-white/45"}
+      >
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" />
+      </svg>
+    ),
+  },
 ];
 
 export function SettingsModal() {
@@ -36,8 +164,51 @@ export function SettingsModal() {
   const deleteItem = useLaunchpadStore((state) => state.deleteItem);
   const resetToDefaults = useLaunchpadStore((state) => state.resetToDefaults);
 
-  const [activeTab, setActiveTab] = useState<SettingsTabId>('wallpaper');
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("wallpaper");
+  const [itemToDelete, setItemToDelete] = useState<{
+    id: string;
+    title: string;
+    type: "shortcut" | "folder";
+  } | null>(null);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Live Wallpaper preview state
+  const [pendingVideo, setPendingVideo] = useState<{
+    file: File;
+    previewUrl: string;
+    name: string;
+    sizeFormatted: string;
+    isError?: boolean;
+  } | null>(null);
+  const [videoErrorMessage, setVideoErrorMessage] = useState<string | null>(null);
+  const [isSavingVideo, setIsSavingVideo] = useState(false);
+
+  const handleCancelPreview = () => {
+    if (pendingVideo) {
+      URL.revokeObjectURL(pendingVideo.previewUrl);
+      setPendingVideo(null);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (pendingVideo) {
+          handleCancelPreview();
+        } else if (itemToDelete) {
+          setItemToDelete(null);
+        } else if (isResetConfirmOpen) {
+          setIsResetConfirmOpen(false);
+        } else {
+          setSettingsOpen(false);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [setSettingsOpen, itemToDelete, isResetConfirmOpen, pendingVideo]);
 
   if (!isSettingsOpen) return null;
 
@@ -50,7 +221,7 @@ export function SettingsModal() {
       const dataUrl = e.target?.result as string;
       if (dataUrl) {
         setWallpaper({
-          type: 'custom',
+          type: "custom",
           customDataUrl: dataUrl,
         });
       }
@@ -58,161 +229,329 @@ export function SettingsModal() {
     reader.readAsDataURL(file);
   };
 
+  const handleVideoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset input value so selecting the same file triggers again
+    event.target.value = "";
+
+    const isVideoExt = /\.(mp4|webm|ogg|mov)$/i.test(file.name);
+    const validTypes = ["video/mp4", "video/webm", "video/ogg", "video/quicktime"];
+    if (!validTypes.includes(file.type) && !isVideoExt) {
+      setVideoErrorMessage("Please choose a valid MP4 or WebM video file.");
+      return;
+    }
+
+    if (file.size > 120 * 1024 * 1024) {
+      setVideoErrorMessage("File is too large. Please choose a video under 120MB.");
+      return;
+    }
+
+    const sizeFormatted =
+      file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${(file.size / 1024).toFixed(0)} KB`;
+
+    const previewUrl = URL.createObjectURL(file);
+    setVideoErrorMessage(null);
+    setPendingVideo({
+      file,
+      previewUrl,
+      name: file.name,
+      sizeFormatted,
+    });
+  };
+
+  const handleApplyLiveWallpaper = async () => {
+    if (!pendingVideo) return;
+    setIsSavingVideo(true);
+    try {
+      await saveLiveWallpaperBlob(pendingVideo.file);
+      setWallpaper({
+        type: "video",
+        videoFileName: pendingVideo.name,
+      });
+      URL.revokeObjectURL(pendingVideo.previewUrl);
+      setPendingVideo(null);
+      setVideoErrorMessage(null);
+    } catch (err) {
+      console.error("Failed to save live wallpaper:", err);
+      setVideoErrorMessage("Failed to save live wallpaper locally.");
+    } finally {
+      setIsSavingVideo(false);
+    }
+  };
+
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 backdrop-blur-sm p-4 pb-16"
+        onClick={() => setSettingsOpen(false)}
+      >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
-          className="relative flex h-[560px] w-[740px] overflow-hidden rounded-[16px] border border-white/20 bg-[#161224]/94 shadow-[0_30px_90px_rgba(0,0,0,0.8)] backdrop-blur-3xl text-white select-none"
+          exit={{ opacity: 0, scale: 0.96, y: 8 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="relative flex h-[475px] w-[740px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[20px] border border-white/[0.08] bg-[#121215]/75 shadow-[0_28px_80px_-15px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.09)] backdrop-blur-3xl text-white select-none"
+          onClick={(e) => e.stopPropagation()}
         >
-          {/* Left Sidebar */}
-          <div className="flex w-[200px] flex-col border-r border-white/10 bg-white/[0.04] p-3.5">
-            {/* macOS Window Controls */}
-            <div className="mb-4 flex items-center gap-2 px-1 pt-0.5">
-              <button
-                onClick={() => setSettingsOpen(false)}
-                className="h-3 w-3 rounded-full bg-[#ff5f56] hover:brightness-90 transition-all"
-                title="Close"
-              />
-              <div className="h-3 w-3 rounded-full bg-[#ffbd2e]" />
-              <div className="h-3 w-3 rounded-full bg-[#27c93f]" />
-            </div>
+          {/* Subtle Top Specular / Ambient Rim */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
-            <span className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">
+          {/* Close Button */}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(false)}
+            className="absolute top-3.5 right-3.5 z-20 flex h-7 w-7 items-center justify-center rounded-[8px] text-white/40 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+            title="Close (Esc)"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+
+          {/* Left Sidebar - Integrated Glass Column */}
+          <div className="flex w-[195px] shrink-0 flex-col border-r border-white/[0.06] p-3 pt-4">
+            <span className="mb-2 px-2.5 text-[11px] font-medium text-white/40">
               Preferences
             </span>
 
             {/* Nav Tabs */}
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
               {TABS.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
+                    type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium transition-colors ${
+                    className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer ${
                       isActive
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-white/70 hover:bg-white/10 hover:text-white'
+                        ? "text-white font-medium"
+                        : "text-white/60 hover:text-white hover:bg-white/[0.04]"
                     }`}
                   >
-                    <span>{tab.icon}</span>
-                    <span>{tab.label}</span>
+                    {isActive && (
+                      <motion.div
+                        layoutId="settings-active-tab-pill"
+                        className="absolute inset-0 rounded-lg bg-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                        transition={{
+                          type: "spring",
+                          stiffness: 450,
+                          damping: 35,
+                        }}
+                      />
+                    )}
+                    <span className="relative z-10 shrink-0">
+                      {tab.icon(isActive)}
+                    </span>
+                    <span className="relative z-10 truncate">{tab.label}</span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="mt-auto px-2 pt-4 border-t border-white/10">
+            {/* Reset to Defaults Action */}
+            <div className="mt-auto px-1 pt-2.5 border-t border-white/[0.06]">
               <button
-                onClick={() => {
-                  if (confirm('Reset all Tabin settings, shortcuts, and wallpapers to default?')) {
-                    resetToDefaults();
-                  }
-                }}
-                className="w-full rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-center text-[11px] font-medium text-red-300 hover:bg-red-500/20 transition-colors"
+                type="button"
+                onClick={() => setIsResetConfirmOpen(true)}
+                className="group w-full rounded-lg px-2.5 py-1.5 text-left text-[11px] font-medium text-white/35 hover:text-red-400 hover:bg-red-500/[0.08] transition-colors cursor-pointer flex items-center justify-between"
               >
-                Reset to Defaults
+                <span>Reset to Defaults</span>
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="opacity-40 group-hover:opacity-100 transition-opacity"
+                >
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                  <path d="M21 3v5h-5" />
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                  <path d="M8 16H3v5" />
+                </svg>
               </button>
             </div>
           </div>
 
-          {/* Right Panel Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          {/* Right Content Area */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-6 py-5">
             {/* Wallpaper Tab */}
-            {activeTab === 'wallpaper' && (
-              <div className="space-y-6">
+            {activeTab === "wallpaper" && (
+              <div className="space-y-4">
                 <div>
-                  <h3 className="text-base font-semibold text-white/90">Wallpaper</h3>
-                  <p className="text-[12px] text-white/50">
-                    Choose an Apple-style desktop background or upload your own image.
+                  <h3 className="text-[14px] font-medium text-white/90 tracking-tight">
+                    Wallpaper
+                  </h3>
+                  <p className="text-[11.5px] text-white/40 mt-0.5">
+                    Choose a desktop background or upload your own.
                   </p>
                 </div>
 
-                {/* Presets Grid */}
-                <div className="grid grid-cols-2 gap-3.5">
+                {/* Presets Grid - Single 4-column row */}
+                <div className="grid grid-cols-4 gap-2.5">
                   {PRESET_WALLPAPERS.map((preset) => {
                     const isSelected =
-                      wallpaper.type === 'preset' && wallpaper.presetId === preset.id;
+                      wallpaper.type === "preset" &&
+                      wallpaper.presetId === preset.id;
+                    const displayName = preset.name.replace(/^macOS\s+/i, "");
                     return (
                       <button
                         key={preset.id}
+                        type="button"
+                        title={displayName}
                         onClick={() =>
-                          setWallpaper({ type: 'preset', presetId: preset.id })
+                          setWallpaper({ type: "preset", presetId: preset.id })
                         }
-                        className={`group relative flex flex-col overflow-hidden rounded-xl border text-left transition-all ${
+                        className={`group relative aspect-[16/10] overflow-hidden rounded-xl border transition-all cursor-pointer ${
                           isSelected
-                            ? 'border-blue-500 ring-2 ring-blue-500/50 shadow-md'
-                            : 'border-white/15 hover:border-white/30'
+                            ? "border-[#FA1E76]/80 ring-1 ring-[#FA1E76]/40 shadow-[0_2px_12px_rgba(250,30,118,0.15)]"
+                            : "border-white/[0.07] bg-white/[0.02] hover:border-white/[0.18]"
                         }`}
                       >
-                        <div className="h-24 w-full overflow-hidden bg-black/40">
-                          <img
-                            src={preset.url}
-                            alt={preset.name}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between bg-white/[0.06] px-3 py-2">
-                          <span className="text-[12px] font-medium text-white/90">
-                            {preset.name}
-                          </span>
-                          {isSelected && (
-                            <span className="text-[12px] text-blue-400 font-bold">✓</span>
-                          )}
-                        </div>
+                        <img
+                          src={preset.url}
+                          alt={displayName}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Custom Upload */}
-                <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-[13px] font-medium text-white/90">Custom Image</h4>
-                      <p className="text-[11px] text-white/50">
-                        Upload any high-res wallpaper from your computer.
-                      </p>
-                    </div>
+                {/* Custom Upload - Compact inline row */}
+                <div className="flex items-center justify-between pt-3 border-t border-white/[0.06] gap-3">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-white/20 transition-colors"
-                      >
-                        Choose File…
-                      </button>
+                      <h4 className="text-[12px] font-medium text-white/85">
+                        Custom Image
+                      </h4>
+                      {wallpaper.type === "custom" && wallpaper.customDataUrl && (
+                        <span className="text-[10.5px] text-emerald-400 flex items-center gap-1 font-medium shrink-0">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Active
+                        </span>
+                      )}
                     </div>
+                    <p className="text-[11px] text-white/40 mt-0.5">
+                      Upload a high-res image from your device.
+                    </p>
                   </div>
-                  {wallpaper.type === 'custom' && wallpaper.customDataUrl && (
-                    <div className="mt-3 flex items-center gap-3">
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {wallpaper.type === "custom" && wallpaper.customDataUrl && (
                       <img
                         src={wallpaper.customDataUrl}
                         alt="Custom preview"
-                        className="h-12 w-20 rounded-md object-cover border border-white/20"
+                        className="h-6 w-9 rounded-md object-cover border border-white/[0.1] shrink-0"
                       />
-                      <span className="text-[12px] text-emerald-400">Custom wallpaper active</span>
-                    </div>
-                  )}
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="shrink-0 whitespace-nowrap rounded-lg border border-white/[0.09] bg-white/[0.06] hover:bg-white/[0.12] px-3 py-1 text-[11.5px] font-medium text-white/90 transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                    >
+                      Choose File…
+                    </button>
+                  </div>
                 </div>
 
-                {/* Sliders: Blur & Dimming */}
-                <div className="space-y-4 rounded-xl border border-white/15 bg-white/[0.04] p-4">
+                {/* Live Wallpaper - Compact inline row */}
+                <div className="flex items-center justify-between pt-3 border-t border-white/[0.06] gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-[12px] font-medium text-white/85">
+                        Live Wallpaper
+                      </h4>
+                      {wallpaper.type === "video" && (
+                        <span className="text-[10.5px] text-emerald-400 flex items-center gap-1 font-medium shrink-0">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-white/40 mt-0.5">
+                      Looping MP4 or WebM video background without sound.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {wallpaper.type === "video" && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWallpaper({ type: "preset", presetId: "monterey" })
+                        }
+                        className="shrink-0 whitespace-nowrap text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer px-1 py-0.5"
+                        title="Switch back to static wallpaper"
+                      >
+                        Reset to static
+                      </button>
+                    )}
+                    <input
+                      ref={videoFileInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/ogg,video/quicktime,.mp4,.webm"
+                      onChange={handleVideoSelect}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => videoFileInputRef.current?.click()}
+                      className="shrink-0 whitespace-nowrap rounded-lg border border-white/[0.09] bg-white/[0.06] hover:bg-white/[0.12] px-3 py-1 text-[11.5px] font-medium text-white/90 transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                    >
+                      Choose Video…
+                    </button>
+                  </div>
+                </div>
+
+                {/* Video Error Message if any */}
+                {videoErrorMessage && (
+                  <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-[11px] text-red-300 flex items-center justify-between">
+                    <span>{videoErrorMessage}</span>
+                    <button
+                      type="button"
+                      onClick={() => setVideoErrorMessage(null)}
+                      className="text-white/40 hover:text-white cursor-pointer ml-2 text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {/* Sliders: Blur & Dimming - Compact Side-by-Side */}
+                <div className="grid grid-cols-2 gap-4 pt-3.5 border-t border-white/[0.06]">
                   {/* Blur */}
                   <div>
-                    <div className="flex items-center justify-between text-[12px]">
-                      <span className="font-medium text-white/90">Wallpaper Blur</span>
-                      <span className="text-white/50 font-mono">{wallpaper.blur ?? 0}px</span>
+                    <div className="flex items-center justify-between text-[11.5px]">
+                      <span className="font-medium text-white/80">
+                        Wallpaper Blur
+                      </span>
+                      <span className="text-white/45 font-mono text-[10.5px] bg-white/[0.04] px-1.5 py-0.5 rounded">
+                        {wallpaper.blur ?? 0}px
+                      </span>
                     </div>
                     <input
                       type="range"
@@ -220,16 +559,20 @@ export function SettingsModal() {
                       max={30}
                       step={1}
                       value={wallpaper.blur ?? 0}
-                      onChange={(e) => setWallpaper({ blur: Number(e.target.value) })}
-                      className="mt-2 w-full accent-blue-500 cursor-pointer"
+                      onChange={(e) =>
+                        setWallpaper({ blur: Number(e.target.value) })
+                      }
+                      className="mt-1.5 w-full accent-[#FA1E76] cursor-pointer"
                     />
                   </div>
 
                   {/* Darkness */}
                   <div>
-                    <div className="flex items-center justify-between text-[12px]">
-                      <span className="font-medium text-white/90">Background Dimming</span>
-                      <span className="text-white/50 font-mono">
+                    <div className="flex items-center justify-between text-[11.5px]">
+                      <span className="font-medium text-white/80">
+                        Background Dimming
+                      </span>
+                      <span className="text-white/45 font-mono text-[10.5px] bg-white/[0.04] px-1.5 py-0.5 rounded">
                         {Math.round((wallpaper.darkness ?? 0.15) * 100)}%
                       </span>
                     </div>
@@ -239,200 +582,392 @@ export function SettingsModal() {
                       max={0.75}
                       step={0.05}
                       value={wallpaper.darkness ?? 0.15}
-                      onChange={(e) => setWallpaper({ darkness: Number(e.target.value) })}
-                      className="mt-2 w-full accent-blue-500 cursor-pointer"
+                      onChange={(e) =>
+                        setWallpaper({ darkness: Number(e.target.value) })
+                      }
+                      className="mt-1.5 w-full accent-[#FA1E76] cursor-pointer"
                     />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Appearance Tab */}
-            {activeTab === 'appearance' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-white/90">Appearance</h3>
-                  <p className="text-[12px] text-white/50">Configure shortcut icon dimensions and styling.</p>
-                </div>
-
-                <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4 space-y-4">
-                  <div>
-                    <label className="block text-[13px] font-medium text-white/90">Icon Scale</label>
-                    <p className="text-[11px] text-white/50 mb-2">Adjust bounding size for Tabin icons.</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['compact', 'standard', 'large'] as const).map((scale) => (
-                        <button
-                          key={scale}
-                          onClick={() => updateSettings({ iconScale: scale })}
-                          className={`rounded-lg border px-3 py-2 text-center text-[12px] font-medium capitalize transition-all ${
-                            settings.iconScale === scale
-                              ? 'border-blue-500 bg-blue-600/30 text-white'
-                              : 'border-white/10 bg-white/[0.05] text-white/70 hover:bg-white/10'
-                          }`}
-                        >
-                          {scale}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Layout Tab */}
-            {activeTab === 'layout' && (
+            {activeTab === "layout" && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-base font-semibold text-white/90">Layout</h3>
-                  <p className="text-[12px] text-white/50">Control grid columns and alignment density.</p>
-                </div>
-
-                <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4 space-y-3">
-                  <label className="block text-[13px] font-medium text-white/90">Grid Columns</label>
-                  <p className="text-[11px] text-white/50">
-                    macOS Launchpad uses 10 columns on desktop. You can lock or auto-adapt.
+                  <h3 className="text-[15px] font-medium text-white/90 tracking-tight">
+                    Layout
+                  </h3>
+                  <p className="text-[12px] text-white/45 mt-0.5">
+                    Control grid columns and alignment density.
                   </p>
-                  <div className="grid grid-cols-5 gap-2">
-                    {(['auto', '6', '7', '8', '10'] as GridColumnsMode[]).map((mode) => (
-                      <button
-                        key={mode}
-                        onClick={() => updateSettings({ gridColumns: mode })}
-                        className={`rounded-lg border px-2 py-2 text-center text-[12px] font-medium capitalize transition-all ${
-                          settings.gridColumns === mode
-                            ? 'border-blue-500 bg-blue-600/30 text-white'
-                            : 'border-white/10 bg-white/[0.05] text-white/70 hover:bg-white/10'
-                        }`}
-                      >
-                        {mode === 'auto' ? 'Auto' : `${mode} Cols`}
-                      </button>
-                    ))}
+                </div>
+
+                <div className="pt-5 border-t border-white/[0.06] space-y-3">
+                  <div>
+                    <h4 className="text-[13px] font-medium text-white/85">
+                      Grid Columns
+                    </h4>
+                    <p className="text-[11.5px] text-white/45 mt-0.5">
+                      Choose Auto to adapt to your screen or lock to a specific
+                      count.
+                    </p>
                   </div>
-                </div>
-              </div>
-            )}
 
-            {/* Dock Tab */}
-            {activeTab === 'dock' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-white/90">Dock</h3>
-                  <p className="text-[12px] text-white/50">Customize the bottom pinned shelf.</p>
-                </div>
-
-                <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-[13px] font-medium text-white/90">Magnification</h4>
-                      <p className="text-[11px] text-white/50">Enlarge icons smoothly on hover.</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.dockMagnification}
-                      onChange={(e) => updateSettings({ dockMagnification: e.target.checked })}
-                      className="h-4 w-4 rounded accent-blue-500 cursor-pointer"
-                    />
+                  <div className="inline-flex p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] gap-1">
+                    {(["auto", "6", "7", "8", "10"] as GridColumnsMode[]).map(
+                      (mode) => {
+                        const isSelected = settings.gridColumns === mode;
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() =>
+                              updateSettings({ gridColumns: mode })
+                            }
+                            className={`relative px-3.5 py-1.5 text-[12px] font-medium rounded-lg transition-colors cursor-pointer ${
+                              isSelected
+                                ? "text-white"
+                                : "text-white/50 hover:text-white/80"
+                            }`}
+                          >
+                            {isSelected && (
+                              <motion.div
+                                layoutId="settings-layout-pill"
+                                className="absolute inset-0 rounded-lg bg-white/[0.12] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]"
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 450,
+                                  damping: 35,
+                                }}
+                              />
+                            )}
+                            <span className="relative z-10 capitalize">
+                              {mode === "auto" ? "Auto" : `${mode} Cols`}
+                            </span>
+                          </button>
+                        );
+                      },
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
             {/* Shortcuts Tab */}
-            {activeTab === 'shortcuts' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-white/90">Shortcuts</h3>
-                  <p className="text-[12px] text-white/50">Manage saved bookmarks and folders.</p>
-                </div>
-
-                <div className="max-h-[340px] overflow-y-auto rounded-xl border border-white/15 bg-white/[0.04] divide-y divide-white/10">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-2.5 px-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {item.type === 'shortcut' ? (
-                          <img
-                            src={getFaviconUrl(item.url, 64) ?? ''}
-                            alt=""
-                            className="h-6 w-6 object-contain shrink-0"
-                          />
-                        ) : (
-                          <span className="text-base shrink-0">📁</span>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-white/90 truncate">
-                            {item.title}
-                          </p>
-                          {item.type === 'shortcut' && (
-                            <p className="text-[10px] text-white/40 truncate">
-                              {getHostname(item.url)}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="rounded px-2 py-1 text-[11px] text-red-400 hover:bg-red-500/20 transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* General Tab */}
-            {activeTab === 'general' && (
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-base font-semibold text-white/90">General</h3>
-                  <p className="text-[12px] text-white/50">Search provider and system shortcuts.</p>
-                </div>
-
-                <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4 space-y-4">
+            {activeTab === "shortcuts" && (
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="flex items-center justify-between mb-4 shrink-0">
                   <div>
-                    <label className="block text-[13px] font-medium text-white/90 mb-1.5">
-                      Default Search Provider
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['google', 'duckduckgo', 'bing'] as const).map((eng) => (
-                        <button
-                          key={eng}
-                          onClick={() => updateSettings({ searchEngine: eng })}
-                          className={`rounded-lg border px-3 py-1.5 text-center text-[12px] font-medium capitalize transition-all ${
-                            settings.searchEngine === eng
-                              ? 'border-blue-500 bg-blue-600/30 text-white'
-                              : 'border-white/10 bg-white/[0.05] text-white/70 hover:bg-white/10'
-                          }`}
-                        >
-                          {eng}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[15px] font-medium text-white/90 tracking-tight">
+                        Shortcuts
+                      </h3>
+                      <span className="rounded-full bg-white/[0.07] px-2 py-0.5 text-[11px] font-medium text-white/50">
+                        {items.length}
+                      </span>
                     </div>
+                    <p className="text-[12px] text-white/45 mt-0.5">
+                      Manage saved bookmarks and folders.
+                    </p>
                   </div>
+                </div>
 
-                  <div className="pt-2 border-t border-white/10">
-                    <h4 className="text-[12px] font-medium text-white/80 mb-2">
-                      Keyboard Shortcuts
-                    </h4>
-                    <div className="space-y-1.5 text-[11px] text-white/60">
-                      <div className="flex justify-between">
-                        <span>Focus search bar</span>
-                        <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5">/</kbd>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Switch Spaces</span>
-                        <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5">← / →</kbd>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Dismiss modal or search</span>
-                        <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5">Esc</kbd>
-                      </div>
+                <div className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-white/[0.06] bg-white/[0.015] divide-y divide-white/[0.04]">
+                  {items.length === 0 ? (
+                    <div className="p-8 text-center text-[12px] text-white/40">
+                      No bookmarks or folders yet.
                     </div>
-                  </div>
+                  ) : (
+                    items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="group flex items-center justify-between p-2.5 px-3.5 hover:bg-white/[0.03] transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {item.type === "shortcut" ? (
+                            <img
+                              src={getFaviconUrl(item.url, 64) ?? ""}
+                              alt=""
+                              className="h-5 w-5 rounded-[5px] object-contain shrink-0"
+                            />
+                          ) : (
+                            <svg
+                              width="18"
+                              height="18"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="text-white/50 shrink-0"
+                            >
+                              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+                            </svg>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-medium text-white/90 truncate leading-snug">
+                              {item.title}
+                            </p>
+                            {item.type === "shortcut" && (
+                              <p className="text-[11px] font-normal text-white/40 truncate leading-snug">
+                                {getHostname(item.url)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setItemToDelete({
+                              id: item.id,
+                              title: item.title,
+                              type: item.type,
+                            })
+                          }
+                          className="opacity-0 group-hover:opacity-100 rounded px-2 py-1 text-[11px] text-white/35 hover:text-red-400 hover:bg-red-500/[0.1] transition-all cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
+
+            {/* Import / Export Tab */}
+            {activeTab === "backup" && <ImportExportTab />}
+
+            {/* Privacy Tab */}
+            {activeTab === "privacy" && <PrivacyTab />}
+
+            {/* About Tab */}
+            {activeTab === "about" && <AboutTab />}
           </div>
+
+          {/* Delete Item Warning Dialog */}
+          <AnimatePresence>
+            {itemToDelete && (
+              <div
+                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                onClick={() => setItemToDelete(null)}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                  transition={{ duration: 0.14, ease: "easeOut" }}
+                  className="w-[330px] rounded-2xl border border-white/10 bg-[#121215]/85 p-5 text-white shadow-[0_24px_64px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.08)] backdrop-blur-3xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/15 text-red-400">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-[13px] font-semibold text-white/95">
+                        Delete{" "}
+                        {itemToDelete.type === "folder" ? "Folder" : "Shortcut"}
+                        ?
+                      </h4>
+                      <p className="mt-1 text-[11px] text-white/50 leading-relaxed">
+                        {itemToDelete.type === "folder"
+                          ? `Are you sure you want to delete "${itemToDelete.title}" and all its contained shortcuts? This action cannot be undone.`
+                          : `Are you sure you want to delete "${itemToDelete.title}"? This action cannot be undone.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setItemToDelete(null)}
+                      className="rounded-lg px-3 py-1.5 text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteItem(itemToDelete.id);
+                        setItemToDelete(null);
+                      }}
+                      className="rounded-lg bg-red-500/90 hover:bg-red-500 px-3.5 py-1.5 text-[12px] font-medium text-white transition-colors cursor-pointer shadow-[0_2px_10px_rgba(239,68,68,0.3)]"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Reset to Defaults Warning Dialog */}
+          <AnimatePresence>
+            {isResetConfirmOpen && (
+              <div
+                className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                onClick={() => setIsResetConfirmOpen(false)}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: -4 }}
+                  transition={{ duration: 0.14, ease: "easeOut" }}
+                  className="w-[330px] rounded-2xl border border-white/10 bg-[#121215]/85 p-5 text-white shadow-[0_24px_64px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.08)] backdrop-blur-3xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500/15 text-red-400">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-[13px] font-semibold text-white/95">
+                        Reset to Defaults?
+                      </h4>
+                      <p className="mt-1 text-[11px] text-white/50 leading-relaxed">
+                        This will reset all Tabin settings, shortcuts, and
+                        wallpapers to their default states. This action cannot
+                        be undone.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsResetConfirmOpen(false)}
+                      className="rounded-lg px-3 py-1.5 text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetToDefaults();
+                        setIsResetConfirmOpen(false);
+                      }}
+                      className="rounded-lg bg-red-500/90 hover:bg-red-500 px-3.5 py-1.5 text-[12px] font-medium text-white transition-colors cursor-pointer shadow-[0_2px_10px_rgba(239,68,68,0.3)]"
+                    >
+                      Reset Everything
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* Live Wallpaper Preview Modal Dialog */}
+          <AnimatePresence>
+            {pendingVideo && (
+              <div
+                className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+                onClick={handleCancelPreview}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 6 }}
+                  transition={{ duration: 0.16, ease: "easeOut" }}
+                  className="w-[420px] max-w-full rounded-2xl border border-white/12 bg-[#121215]/95 p-5 text-white shadow-[0_28px_80px_rgba(0,0,0,0.85),inset_0_1px_0_0_rgba(255,255,255,0.08)] backdrop-blur-3xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between pb-3">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-[13px] font-semibold text-white/95">
+                        Preview Live Wallpaper
+                      </h4>
+                      <span className="rounded px-1.5 py-0.5 text-[9.5px] font-medium bg-[#FA1E76]/15 text-[#FA1E76] border border-[#FA1E76]/25 leading-none">
+                        Video
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-white/45 font-mono">
+                      {pendingVideo.sizeFormatted}
+                    </span>
+                  </div>
+
+                  {/* Video Preview Container */}
+                  <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/70 border border-white/[0.08]">
+                    <video
+                      src={pendingVideo.previewUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      onError={() =>
+                        setPendingVideo((prev) =>
+                          prev ? { ...prev, isError: true } : null
+                        )
+                      }
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white/70 backdrop-blur-md select-none">
+                      Muted · Looping
+                    </div>
+                  </div>
+
+                  {pendingVideo.isError ? (
+                    <p className="mt-2.5 text-[11.5px] text-red-300 leading-relaxed">
+                      This video could not be decoded. Please select an MP4 (H.264) or WebM (VP8/VP9) file.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-[11px] text-white/50 truncate">
+                      {pendingVideo.name}
+                    </p>
+                  )}
+
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCancelPreview}
+                      className="rounded-lg px-3 py-1.5 text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingVideo || pendingVideo.isError}
+                      onClick={handleApplyLiveWallpaper}
+                      className="rounded-lg bg-[#FA1E76] hover:bg-[#ff3086] active:bg-[#e01666] disabled:opacity-40 disabled:cursor-not-allowed px-3.5 py-1.5 text-[12px] font-medium text-white transition-all cursor-pointer shadow-[0_2px_12px_rgba(250,30,118,0.35)]"
+                    >
+                      {isSavingVideo ? "Applying…" : "Apply as Wallpaper"}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </AnimatePresence>

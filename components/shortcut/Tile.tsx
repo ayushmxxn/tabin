@@ -1,10 +1,11 @@
 import { ACCENT_CLASSES, cn, getFaviconUrl, getInitial } from "@/lib/utils";
 import type { AccentToken } from "@/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface TileProps {
   title: string;
   url?: string;
+  customIcon?: string | null;
   accent: AccentToken;
   size?: "lg" | "md" | "sm";
   className?: string;
@@ -21,14 +22,19 @@ const SIZE_CLASSES: Record<NonNullable<TileProps["size"]>, string> = {
 export function Tile({
   title,
   url,
+  customIcon,
   accent,
   size = "lg",
   className,
   children,
 }: TileProps) {
   const [faviconFailed, setFaviconFailed] = useState(false);
-  const favicon = url ? getFaviconUrl(url) : null;
+  const favicon = customIcon || (url ? getFaviconUrl(url) : null);
   const showFavicon = favicon && !faviconFailed;
+
+  useEffect(() => {
+    setFaviconFailed(false);
+  }, [customIcon, url]);
 
   if (children) {
     return (

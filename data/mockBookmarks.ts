@@ -2,7 +2,6 @@ import type { LaunchpadItem, Space } from '@/types';
 
 export const SPACES: Space[] = [
   { id: 'space-home', name: 'Home' },
-  { id: 'space-work', name: 'Work' },
 ];
 
 export const INITIAL_ITEMS: LaunchpadItem[] = [
@@ -76,7 +75,8 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     itemIds: ['figma', 'framer', 'dribbble'],
-    accent: 'violet',
+    accent: 'blue',
+    color: '#50B1FD',
   },
   {
     id: 'figma',
@@ -110,7 +110,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     type: 'shortcut',
     title: 'Stripe',
     url: 'https://stripe.com',
-    spaceId: 'space-work',
+    spaceId: 'space-home',
     folderId: null,
     accent: 'violet',
   },
@@ -119,7 +119,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     type: 'shortcut',
     title: 'Calendar',
     url: 'https://calendar.google.com',
-    spaceId: 'space-work',
+    spaceId: 'space-home',
     folderId: null,
     accent: 'blue',
   },
@@ -128,7 +128,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     type: 'shortcut',
     title: 'Gmail',
     url: 'https://mail.google.com',
-    spaceId: 'space-work',
+    spaceId: 'space-home',
     folderId: null,
     accent: 'rose',
   },
@@ -136,17 +136,18 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     id: 'docs',
     type: 'folder',
     title: 'Docs',
-    spaceId: 'space-work',
+    spaceId: 'space-home',
     folderId: null,
     itemIds: ['drive', 'notion-work'],
-    accent: 'amber',
+    accent: 'blue',
+    color: '#50B1FD',
   },
   {
     id: 'drive',
     type: 'shortcut',
     title: 'Drive',
     url: 'https://drive.google.com',
-    spaceId: 'space-work',
+    spaceId: 'space-home',
     folderId: 'docs',
     accent: 'amber',
   },
@@ -155,17 +156,13 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     type: 'shortcut',
     title: 'Notion',
     url: 'https://notion.so',
-    spaceId: 'space-work',
+    spaceId: 'space-home',
     folderId: 'docs',
     accent: 'slate',
   },
 ];
 
 export const INITIAL_DOCK_IDS: string[] = [
-  'arc',
-  'linear',
-  'figma',
-  'notion',
-  'spotify',
-  'github',
+  'design-tools',
+  'docs',
 ];

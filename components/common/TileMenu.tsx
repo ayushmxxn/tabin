@@ -50,7 +50,7 @@ export function TileMenu({
       role="menu"
       className={cn(
         'absolute top-[calc(100%+6px)] z-50 w-44 overflow-hidden rounded-xl border border-white/15',
-        'bg-[#1a1528]/95 p-1 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-2xl',
+        'bg-[#141414]/98 p-1 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-2xl',
         align === 'center' ? 'left-1/2 -translate-x-1/2' : 'left-0',
       )}
       onPointerDown={(e) => e.stopPropagation()}

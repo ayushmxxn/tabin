@@ -12,6 +12,12 @@ export const GRID_CONFIG = {
   snapThresholdY: 0.045,
 };
 
+export const PAGE_ROWS = 3;
+
+export function getPageCapacity(columns: number): number {
+  return columns * PAGE_ROWS;
+}
+
 export function getColumnsForWidth(width: number, mode: GridColumnsMode = 'auto'): number {
   if (mode !== 'auto') {
     const parsed = parseInt(mode, 10);
@@ -20,6 +26,25 @@ export function getColumnsForWidth(width: number, mode: GridColumnsMode = 'auto'
   if (width < 768) return GRID_CONFIG.minColumns;
   if (width < 1180) return GRID_CONFIG.tabletColumns;
   return GRID_CONFIG.desktopColumns;
+}
+
+export function useColumns(mode: GridColumnsMode = 'auto'): number {
+  const [columns, setColumns] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return getColumnsForWidth(window.innerWidth, mode);
+    }
+    return GRID_CONFIG.desktopColumns;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setColumns(getColumnsForWidth(window.innerWidth, mode));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [mode]);
+
+  return columns;
 }
 
 export function getGridPosition(index: number, columns: number): Position {
@@ -31,13 +56,10 @@ export function getGridPosition(index: number, columns: number): Position {
 }
 
 export function resolveItemPosition(
-  item: LaunchpadItem,
+  _item: LaunchpadItem,
   index: number,
   columns: number,
 ): Position {
-  if (item.position && typeof item.position.x === 'number' && typeof item.position.y === 'number') {
-    return item.position;
-  }
   return getGridPosition(index, columns);
 }
 
