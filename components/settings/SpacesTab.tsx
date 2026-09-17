@@ -185,9 +185,6 @@ export function SpacesTab() {
               <span className="text-[11px] font-medium text-white/45">
                 Your Spaces
               </span>
-              <span className="text-[11px] text-white/35">
-                Switch anytime using the top switcher or Alt+1..9
-              </span>
             </div>
 
             <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.015] divide-y divide-white/[0.04]">

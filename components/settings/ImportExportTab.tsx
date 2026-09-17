@@ -457,7 +457,7 @@ export function ImportExportTab() {
                     {isDragOver ? 'Drop to import' : 'Open bookmark file'}
                   </span>
                   <span className="text-[10.5px] text-white/28 mt-0.5 block">
-                    HTML · JSON · CSV · TXT — format detected automatically
+                    HTML · JSON · CSV · TXT - format detected automatically
                   </span>
                 </div>
               </div>
