@@ -168,12 +168,12 @@ export function SpacesTab() {
               onChange={(e) => setNewSpaceName(e.target.value)}
               placeholder="New space name (e.g. Work, Personal, Dev)"
               maxLength={24}
-              className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] text-white placeholder-white/30 focus:border-[#FA1E76]/60 focus:bg-white/[0.06] focus:outline-none transition-colors"
+              className="flex-1 h-8 rounded-[9px] border border-white/10 bg-white/[0.04] px-3 text-[12px] text-white placeholder-white/30 focus:border-[#FA1E76]/60 focus:bg-white/[0.06] focus:outline-none transition-colors"
             />
             <button
               type="submit"
               disabled={!newSpaceName.trim()}
-              className="shrink-0 rounded-xl border border-white/10 bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-40 disabled:hover:bg-white/[0.06] px-3.5 py-1.5 text-[12px] font-medium text-white transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+              className="shrink-0 h-8 rounded-[9px] border border-white/10 bg-white/[0.06] hover:bg-white/[0.12] disabled:opacity-40 disabled:hover:bg-white/[0.06] px-3.5 text-[12px] font-medium text-white transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] inline-flex items-center justify-center"
             >
               + Add Space
             </button>
@@ -469,14 +469,14 @@ export function SpacesTab() {
                 <button
                   type="button"
                   onClick={() => setSpaceToDelete(null)}
-                  className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] font-medium text-white/80 hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer"
+                  className="h-8 px-3.5 rounded-[9px] border border-white/10 bg-white/[0.04] text-[12px] font-medium text-white/80 hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer inline-flex items-center justify-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmDelete}
-                  className="rounded-xl bg-red-500 px-3 py-1.5 text-[12px] font-medium text-white shadow-lg shadow-red-500/25 hover:bg-red-600 transition-colors cursor-pointer"
+                  className="h-8 px-3.5 rounded-[9px] bg-red-500 text-[12px] font-medium text-white shadow-md shadow-red-500/25 hover:bg-red-600 active:bg-red-700 transition-colors cursor-pointer inline-flex items-center justify-center"
                 >
                   Delete Space
                 </button>

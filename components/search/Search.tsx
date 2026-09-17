@@ -1,5 +1,5 @@
 import { getHostname, openShortcutUrl } from "@/lib/utils";
-import { useLaunchpadStore, selectFolderChildren } from "@/store/useLaunchpadStore";
+import { useLaunchpadStore, selectFolderChildren, selectSearchableItems } from "@/store/useLaunchpadStore";
 import { useColumns, PAGE_ROWS } from "@/lib/layout";
 import type { FolderItem, LaunchpadItem, ShortcutItem } from "@/types";
 import { AnimatePresence, motion } from "motion/react";
@@ -67,24 +67,22 @@ export function Search() {
   const activePageIndex = useLaunchpadStore((state) => state.activePageIndex);
   const gridColumns = useLaunchpadStore((state) => state.settings?.gridColumns ?? 'auto');
   const openLinks = useLaunchpadStore((state) => state.settings?.openLinks ?? 'newTab');
+  const spaces = useLaunchpadStore((state) => state.spaces);
+  const activeSpaceIndex = useLaunchpadStore((state) => state.activeSpaceIndex);
+  const spacesEnabled = useLaunchpadStore((state) => state.settings?.spacesEnabled ?? false);
+  const activeSpace = spaces[activeSpaceIndex] ?? spaces[0] ?? { id: 'space-home', name: 'Home' };
 
   const columns = useColumns(gridColumns);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Searchable items: both shortcuts and folders
+  // Searchable items: both shortcuts and folders scoped to the active Space
   const searchableItems = useMemo(() => {
-    return items.filter(
-      (item): item is ShortcutItem | FolderItem =>
-        item.type === "shortcut" || item.type === "folder",
-    );
-  }, [items]);
+    return selectSearchableItems(items, spacesEnabled ? activeSpace.id : null);
+  }, [items, spacesEnabled, activeSpace.id]);
 
   const query = searchQuery.trim().toLowerCase();
 
   const results = useMemo(() => {
-    if (!isSearchOpen && !query) {
-      return [];
-    }
     if (!query) {
       return searchableItems.slice(0, 8);
     }
@@ -93,12 +91,13 @@ export function Search() {
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score)
       .map(({ item }) => item);
-  }, [searchableItems, query, isSearchOpen]);
+  }, [searchableItems, query]);
 
-  // Reset selected index whenever search opens or query changes
+  // Reset selected index whenever search opens, query changes, or active space changes
   useEffect(() => {
     setSelectedIndex(0);
-  }, [isSearchOpen, searchQuery]);
+  }, [isSearchOpen, searchQuery, activeSpace.id]);
+
 
   // Auto-scroll selected item into view when navigating with arrow keys
   useEffect(() => {
@@ -195,7 +194,10 @@ export function Search() {
           const displayItems: LaunchpadItem[] = activeFolder
             ? selectFolderChildren(items, activeFolder)
             : items.filter(
-                (i): i is ShortcutItem => i.type === "shortcut" && i.folderId === null,
+                (i): i is ShortcutItem =>
+                  i.type === "shortcut" &&
+                  i.folderId === null &&
+                  (!spacesEnabled || (i.spaceId || "space-home") === activeSpace.id),
               );
           const pageSize = columns * PAGE_ROWS;
           const pageItems = activeFolder
@@ -229,6 +231,9 @@ export function Search() {
     activePageIndex,
     columns,
     openFolder,
+    openLinks,
+    spacesEnabled,
+    activeSpace.id,
   ]);
 
   // Click outside to close search
@@ -403,7 +408,9 @@ export function Search() {
             {results.length === 0 ? (
               <div className="px-3 py-3.5 text-center">
                 <p className="text-[12px] text-white/40">
-                  No shortcuts or folders match &ldquo;{searchQuery}&rdquo;
+                  {query
+                    ? `No shortcuts or folders match "${searchQuery}"`
+                    : "No shortcuts yet"}
                 </p>
               </div>
             ) : (

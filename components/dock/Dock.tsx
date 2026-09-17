@@ -34,6 +34,17 @@ const DockFolderItem = memo(function DockFolderItem({
   const colorPickerRef = useRef<HTMLDivElement>(null);
   const folderButtonRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   const updateItem = useLaunchpadStore((state) => state.updateItem);
   const isDragOver = useLaunchpadStore(
     (state) => state.dragOverFolderId === folder.id,
@@ -61,7 +72,7 @@ const DockFolderItem = memo(function DockFolderItem({
 
   useEffect(() => {
     if (!isColorPickerOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent | MouseEvent) => {
       if (
         containerRef.current &&
         containerRef.current.contains(e.target as Node)
@@ -83,11 +94,11 @@ const DockFolderItem = memo(function DockFolderItem({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsColorPickerOpen(false);
     };
-    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("pointerdown", handleClickOutside);
     window.addEventListener("contextmenu", handleContextMenuOutside);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("pointerdown", handleClickOutside);
       window.removeEventListener("contextmenu", handleContextMenuOutside);
       window.removeEventListener("keydown", handleKeyDown);
     };
@@ -266,7 +277,40 @@ const DockFolderItem = memo(function DockFolderItem({
         aria-label={`${folder.title} folder`}
         aria-current={isActive ? "page" : undefined}
         whileTap={{ scale: 0.94 }}
+        onPointerDown={(e) => {
+          if (e.pointerType === 'touch') {
+            isLongPressTriggeredRef.current = false;
+            touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+            clearLongPress();
+            longPressTimerRef.current = setTimeout(() => {
+              isLongPressTriggeredRef.current = true;
+              setIsColorPickerOpen((prev) => !prev);
+              if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                try {
+                  navigator.vibrate(10);
+                } catch {}
+              }
+            }, 500);
+          }
+        }}
+        onPointerMove={(e) => {
+          if (touchStartPosRef.current && longPressTimerRef.current) {
+            const dist = Math.hypot(
+              e.clientX - touchStartPosRef.current.x,
+              e.clientY - touchStartPosRef.current.y,
+            );
+            if (dist > 8) {
+              clearLongPress();
+            }
+          }
+        }}
+        onPointerUp={() => clearLongPress()}
+        onPointerCancel={() => clearLongPress()}
         onClick={() => {
+          if (isLongPressTriggeredRef.current) {
+            isLongPressTriggeredRef.current = false;
+            return;
+          }
           if (isColorPickerOpen) {
             setIsColorPickerOpen(false);
             return;
@@ -343,7 +387,7 @@ export function Dock() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3.5 z-20 flex justify-center">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-[20px] border border-white/10 bg-[#141414]/94 px-3 py-1.5 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+      <div className="pointer-events-auto flex items-center gap-3.5 rounded-[20px] border border-white/10 bg-[#141414]/94 p-1.5 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
         {/* Home Destination Button */}
         <div
           className="relative flex flex-col items-center"
@@ -405,32 +449,34 @@ export function Dock() {
         </div>
 
         {/* User Folders (Reorderable) */}
-        <Reorder.Group
-          as="div"
-          axis="x"
-          values={dockFolders.map((f) => f.id)}
-          onReorder={reorderDock}
-          className="flex items-center gap-3"
-        >
-          {dockFolders.map((folder) => (
-            <Reorder.Item
-              key={folder.id}
-              value={folder.id}
-              as="div"
-              className="cursor-grab active:cursor-grabbing"
-              whileDrag={{ scale: 1.04, zIndex: 30 }}
-            >
-              <DockFolderItem
-                folder={folder}
-                items={items}
-                openFolderId={openFolderId}
-                dockMagnification={dockMagnification}
-                onOpenFolder={openFolder}
-                onCloseFolder={closeFolder}
-              />
-            </Reorder.Item>
-          ))}
-        </Reorder.Group>
+        {dockFolders.length > 0 && (
+          <Reorder.Group
+            as="div"
+            axis="x"
+            values={dockFolders.map((f) => f.id)}
+            onReorder={reorderDock}
+            className="flex items-center gap-3.5"
+          >
+            {dockFolders.map((folder) => (
+              <Reorder.Item
+                key={folder.id}
+                value={folder.id}
+                as="div"
+                className="cursor-grab active:cursor-grabbing touch-none"
+                whileDrag={{ scale: 1.04, zIndex: 30 }}
+              >
+                <DockFolderItem
+                  folder={folder}
+                  items={items}
+                  openFolderId={openFolderId}
+                  dockMagnification={dockMagnification}
+                  onOpenFolder={openFolder}
+                  onCloseFolder={closeFolder}
+                />
+              </Reorder.Item>
+            ))}
+          </Reorder.Group>
+        )}
 
         {/* Add (+) Button */}
         <div
@@ -526,3 +572,5 @@ export function Dock() {
     </div>
   );
 }
+
+

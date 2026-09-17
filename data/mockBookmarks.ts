@@ -13,6 +13,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'violet',
+    ogImage: 'https://linear.app/static/og/homepage.jpg',
   },
   {
     id: 'vercel',
@@ -22,6 +23,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'slate',
+    ogImage: 'https://lishhsx6kmthaacj.public.blob.vercel-storage.com/og-home-not-x.png',
   },
   {
     id: 'arc',
@@ -31,6 +33,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'blue',
+    ogImage: 'https://arc.net/og.png',
   },
   {
     id: 'raycast',
@@ -40,6 +43,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'rose',
+    ogImage: 'https://raycast.com/opengraph-image.png',
   },
   {
     id: 'github',
@@ -49,6 +53,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'slate',
+    ogImage: 'https://images.ctfassets.net/8aevphvgewt8/4pe4eOtUJ0ARpZRE4fNekf/f52b1f9c52f059a33170229883731ed0/GH-Homepage-Universe-img.png',
   },
   {
     id: 'spotify',
@@ -58,6 +63,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'teal',
+    ogImage: 'https://open.spotifycdn.com/cdn/images/download-page-image-mac.fec937cc.png',
   },
   {
     id: 'notion',
@@ -67,6 +73,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'slate',
+    ogImage: 'https://www.notion.com/front-static/meta/teams-and-agents.jpg',
   },
   {
     id: 'design-tools',
@@ -86,6 +93,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: 'design-tools',
     accent: 'rose',
+    ogImage: 'https://cdn.sanity.io/images/599r6htc/regionalized/b08d37520f7d5ad8d6562975b5932dd2d9a862bb-1200x630.gif?w=1200&q=70&fit=max&auto=format',
   },
   {
     id: 'framer',
@@ -95,6 +103,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: 'design-tools',
     accent: 'blue',
+    ogImage: 'https://framerusercontent.com/images/vt65Mbfi3w8ymfTyRfbmgM4Tyo.png',
   },
   {
     id: 'dribbble',
@@ -104,6 +113,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: 'design-tools',
     accent: 'rose',
+    ogImage: 'https://cdn.dribbble.com/uploads/68059/original/f95c1a744395b01385a3685ba20daac0.png?1770659618',
   },
   {
     id: 'stripe',
@@ -113,6 +123,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: null,
     accent: 'violet',
+    ogImage: 'https://images.stripeassets.com/fzn2n1nzq965/XtX984S1GJVsVOXFC7kMu/01988281e867728dfb09aa7793a6e3b9/Stripe.jpg?q=80',
   },
   {
     id: 'gcal',
@@ -159,6 +170,7 @@ export const INITIAL_ITEMS: LaunchpadItem[] = [
     spaceId: 'space-home',
     folderId: 'docs',
     accent: 'slate',
+    ogImage: 'https://www.notion.com/front-static/meta/teams-and-agents.jpg',
   },
 ];
 

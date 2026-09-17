@@ -1,7 +1,7 @@
 import { PRESET_WALLPAPERS } from "@/data/wallpapers";
 import { getFaviconUrl, getHostname } from "@/lib/utils";
 import { useLaunchpadStore } from "@/store/useLaunchpadStore";
-import type { GridColumnsMode } from "@/types";
+import type { GridColumnsMode, ShortcutStyleMode } from "@/types";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ImportExportTab } from "./ImportExportTab";
@@ -427,7 +427,7 @@ export function SettingsModal() {
           </div>
 
           {/* Right Content Area */}
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto px-6 py-5">
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto touch-pan-y px-6 py-5">
             {/* Wallpaper Tab */}
             {activeTab === "wallpaper" && (
               <div className="space-y-4">
@@ -537,7 +537,7 @@ export function SettingsModal() {
                       <button
                         type="button"
                         onClick={() =>
-                          setWallpaper({ type: "preset", presetId: "monterey" })
+                          setWallpaper({ type: "preset", presetId: "sonoma" })
                         }
                         className="shrink-0 whitespace-nowrap text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer px-1 py-0.5"
                         title="Switch back to static wallpaper"
@@ -585,7 +585,7 @@ export function SettingsModal() {
                         Wallpaper Blur
                       </span>
                       <span className="text-white/45 font-mono text-[10.5px] bg-white/[0.04] px-1.5 py-0.5 rounded">
-                        {wallpaper.blur ?? 0}px
+                        {wallpaper.blur ?? 10}px
                       </span>
                     </div>
                     <input
@@ -593,7 +593,7 @@ export function SettingsModal() {
                       min={0}
                       max={30}
                       step={1}
-                      value={wallpaper.blur ?? 0}
+                      value={wallpaper.blur ?? 10}
                       onChange={(e) =>
                         setWallpaper({ blur: Number(e.target.value) })
                       }
@@ -685,6 +685,57 @@ export function SettingsModal() {
                         );
                       },
                     )}
+                  </div>
+                </div>
+
+                {/* Shortcut Style Setting */}
+                <div className="pt-5 border-t border-white/[0.06] space-y-3">
+                  <div>
+                    <h4 className="text-[13px] font-medium text-white/85">
+                      Shortcut style
+                    </h4>
+                    <p className="text-[11.5px] text-white/45 mt-0.5">
+                      Choose between classic app icons and compact preview embeds.
+                    </p>
+                  </div>
+
+                  <div className="inline-flex p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] gap-1">
+                    {(
+                      [
+                        { id: "icons", label: "Icons" },
+                        { id: "embeds", label: "Embeds" },
+                      ] as const
+                    ).map((styleOpt) => {
+                      const isSelected =
+                        (settings.shortcutStyle ?? "icons") === styleOpt.id;
+                      return (
+                        <button
+                          key={styleOpt.id}
+                          type="button"
+                          onClick={() =>
+                            updateSettings({ shortcutStyle: styleOpt.id })
+                          }
+                          className={`relative px-3.5 py-1.5 text-[12px] font-medium rounded-lg transition-colors cursor-pointer ${
+                            isSelected
+                              ? "text-white"
+                              : "text-white/50 hover:text-white/80"
+                          }`}
+                        >
+                          {isSelected && (
+                            <motion.div
+                              layoutId="settings-shortcut-style-pill"
+                              className="absolute inset-0 rounded-lg bg-white/[0.12] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 450,
+                                damping: 35,
+                              }}
+                            />
+                          )}
+                          <span className="relative z-10">{styleOpt.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -887,7 +938,7 @@ export function SettingsModal() {
                     <button
                       type="button"
                       onClick={() => setItemToDelete(null)}
-                      className="rounded-lg px-3 py-1.5 text-[12px] font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                      className="h-8 px-3.5 rounded-[9px] border border-white/10 bg-white/[0.04] text-[12px] font-medium text-white/80 hover:bg-white/[0.08] hover:text-white transition-colors cursor-pointer inline-flex items-center justify-center"
                     >
                       Cancel
                     </button>
@@ -897,7 +948,7 @@ export function SettingsModal() {
                         deleteItem(itemToDelete.id);
                         setItemToDelete(null);
                       }}
-                      className="rounded-lg bg-red-500/90 hover:bg-red-500 px-3.5 py-1.5 text-[12px] font-medium text-white transition-colors cursor-pointer shadow-[0_2px_10px_rgba(239,68,68,0.3)]"
+                      className="h-8 px-3.5 rounded-[9px] bg-red-500 text-[12px] font-medium text-white shadow-md shadow-red-500/25 hover:bg-red-600 active:bg-red-700 transition-colors cursor-pointer inline-flex items-center justify-center"
                     >
                       Delete
                     </button>

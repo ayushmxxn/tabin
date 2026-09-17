@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Tile } from '../shortcut/Tile';
+import { ShortcutEmbedTile } from '../shortcut/ShortcutEmbedTile';
 import { useLaunchpadStore, selectFolderChildren } from '@/store/useLaunchpadStore';
 import { openShortcutUrl } from '@/lib/utils';
 import type { FolderItem } from '@/types';
@@ -15,6 +16,8 @@ export function FolderOverlay() {
   const items = useLaunchpadStore((state) => state.items);
   const closeFolder = useLaunchpadStore((state) => state.closeFolder);
   const openLinks = useLaunchpadStore((state) => state.settings?.openLinks ?? 'newTab');
+  const shortcutStyle = useLaunchpadStore((state) => state.settings?.shortcutStyle ?? 'icons');
+  const isEmbedMode = shortcutStyle === 'embeds';
 
   const folder = items.find(
     (item): item is FolderItem => item.type === 'folder' && item.id === openFolderId,
@@ -44,26 +47,47 @@ export function FolderOverlay() {
         >
           <motion.div
             layoutId={`folder-tile-${folder.id}`}
-            className="w-[min(90vw,32rem)] rounded-[24px] border border-white/15 bg-white/[0.09] p-7 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+            className={
+              isEmbedMode
+                ? "w-[min(92vw,44rem)] max-h-[85vh] overflow-y-auto touch-pan-y no-scrollbar rounded-[24px] border border-white/15 bg-white/[0.09] p-7 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+                : "w-[min(90vw,32rem)] rounded-[24px] border border-white/15 bg-white/[0.09] p-7 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+            }
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="mb-6 text-center text-body font-medium text-white/90">{folder.title}</h2>
-            <div className="grid grid-cols-4 gap-x-4 gap-y-6 sm:grid-cols-5">
-              {children.map((child) =>
-                child.type === 'shortcut' ? (
-                  <button
-                    key={child.id}
-                    className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-                    onClick={() => openShortcutUrl(child.url, openLinks)}
-                  >
-                    <Tile title={child.title} url={child.url} accent={child.accent} size="md" />
-                    <span className="max-w-[4.75rem] truncate text-center text-caption font-normal text-white/80">
-                      {child.title}
-                    </span>
-                  </button>
-                ) : null,
-              )}
-            </div>
+            {isEmbedMode ? (
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {children.map((child) =>
+                  child.type === 'shortcut' ? (
+                    <button
+                      key={child.id}
+                      type="button"
+                      className="cursor-pointer text-left transition-opacity hover:opacity-90 active:opacity-80"
+                      onClick={() => openShortcutUrl(child.url, openLinks)}
+                    >
+                      <ShortcutEmbedTile item={child} />
+                    </button>
+                  ) : null,
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-x-4 gap-y-6 sm:grid-cols-5">
+                {children.map((child) =>
+                  child.type === 'shortcut' ? (
+                    <button
+                      key={child.id}
+                      className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                      onClick={() => openShortcutUrl(child.url, openLinks)}
+                    >
+                      <Tile title={child.title} url={child.url} accent={child.accent} size="md" />
+                      <span className="max-w-[4.75rem] truncate text-center text-caption font-normal text-white/80">
+                        {child.title}
+                      </span>
+                    </button>
+                  ) : null,
+                )}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

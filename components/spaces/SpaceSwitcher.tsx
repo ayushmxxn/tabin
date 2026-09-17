@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { motion } from "motion/react";
 import { useLaunchpadStore } from "@/store/useLaunchpadStore";
+import { SpaceIndicator } from "./SpaceIndicator";
 
 export function SpaceSwitcher() {
   const spaces = useLaunchpadStore((state) => state.spaces);
@@ -54,11 +55,13 @@ export function SpaceSwitcher() {
   if (!spacesEnabled) return null;
 
   return (
-    <div
-      role="tablist"
-      aria-label="Spaces"
-      className="pointer-events-auto fixed top-3.5 left-6 z-20 flex items-center gap-1 rounded-[14px] border border-white/10 bg-[#141414]/85 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl select-none"
-    >
+    <div className="pointer-events-none fixed inset-x-0 bottom-20 z-20 flex flex-col items-center gap-2.5 select-none">
+      <SpaceIndicator />
+      <div
+        role="tablist"
+        aria-label="Spaces"
+        className="pointer-events-auto flex items-center gap-1 rounded-[14px] border border-white/10 bg-[#141414]/90 p-1 shadow-[0_12px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl"
+      >
       {spaces.map((space, index) => {
         const isActive = activeSpaceIndex === index;
         const isHome = space.id === "space-home";
@@ -130,6 +133,7 @@ export function SpaceSwitcher() {
           </button>
         );
       })}
+      </div>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, memo, type RefObject } from 'react';
 import { AnimatePresence, motion, useDragControls } from 'motion/react';
 import { Tile } from './Tile';
+import { ShortcutEmbedTile, clearFailedImageUrl } from './ShortcutEmbedTile';
 import { useCanvasDrag } from '@/hooks/useCanvasDrag';
 import { useLaunchpadStore } from '@/store/useLaunchpadStore';
 import { cn, getHostname, openShortcutUrl } from '@/lib/utils';
+import { fetchWebsiteMetadata } from '@/lib/fetchMetadata';
 import type { ShortcutItem } from '@/types';
 
 interface ShortcutProps {
@@ -33,6 +35,14 @@ export const Shortcut = memo(function Shortcut({
   const setActiveShortcutMenuId = useLaunchpadStore((state) => state.setActiveShortcutMenuId);
   const setHoveredShortcutId = useLaunchpadStore((state) => state.setHoveredShortcutId);
   const openLinks = useLaunchpadStore((state) => state.settings?.openLinks ?? 'newTab');
+  const spaces = useLaunchpadStore((state) => state.spaces);
+  const spacesEnabled = useLaunchpadStore(
+    (state) => state.settings?.spacesEnabled ?? false,
+  );
+  const shortcutStyle = useLaunchpadStore(
+    (state) => state.settings?.shortcutStyle ?? 'icons',
+  );
+  const isEmbedMode = shortcutStyle === 'embeds';
 
   const isMenuOpen = useLaunchpadStore((state) => state.activeShortcutMenuId === item.id);
   const hasAnyMenuOpen = useLaunchpadStore((state) => state.activeShortcutMenuId !== null);
@@ -40,14 +50,24 @@ export const Shortcut = memo(function Shortcut({
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(item.title);
   const [isPressed, setIsPressed] = useState(false);
-  const [hoveredMenuIndex, setHoveredMenuIndex] = useState<number | null>(null);
+  const [hoveredMenuIndex, setHoveredMenuIndex] = useState<string | number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const lastContextMenuTime = useRef(0);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
   const dragControls = useDragControls();
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
 
   const pageOffset = globalIndex !== undefined && index !== undefined ? globalIndex - index : 0;
 
@@ -69,7 +89,7 @@ export const Shortcut = memo(function Shortcut({
       setIsEditing(false);
       return;
     }
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent | MouseEvent) => {
       if (Date.now() - lastContextMenuTime.current < 400) return;
       if (containerRef.current && containerRef.current.contains(e.target as Node)) {
         return;
@@ -92,11 +112,11 @@ export const Shortcut = memo(function Shortcut({
         setIsEditing(false);
       }
     };
-    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('pointerdown', handleClickOutside);
     window.addEventListener('contextmenu', handleContextMenuOutside);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('pointerdown', handleClickOutside);
       window.removeEventListener('contextmenu', handleContextMenuOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -133,9 +153,37 @@ export const Shortcut = memo(function Shortcut({
     setActiveShortcutMenuId(null);
   };
 
+  const [isRefreshingPreview, setIsRefreshingPreview] = useState(false);
+
   const handleResetFavicon = () => {
     updateItem(item.id, { customIcon: null });
     setActiveShortcutMenuId(null);
+  };
+
+  const handleRefreshPreview = async () => {
+    if (!item.url || isRefreshingPreview) return;
+    setIsRefreshingPreview(true);
+    if (item.ogImage) {
+      clearFailedImageUrl(item.ogImage);
+    }
+    try {
+      const meta = await fetchWebsiteMetadata(item.url, true);
+      const updates: Record<string, unknown> = {};
+      if (meta.ogImage) {
+        updates.ogImage = meta.ogImage;
+      }
+      if (meta.favicon && !item.customIcon) {
+        updates.customIcon = meta.favicon;
+      }
+      if (Object.keys(updates).length > 0) {
+        updateItem(item.id, updates);
+      }
+    } catch {
+      // Ignored
+    } finally {
+      setIsRefreshingPreview(false);
+      setActiveShortcutMenuId(null);
+    }
   };
 
   // Calculate physical trajectory offset from dock folder to resting position
@@ -301,7 +349,10 @@ export const Shortcut = memo(function Shortcut({
         aria-label={`Open ${item.title}`}
         data-tile-id={item.id}
         className={cn(
-          "flex w-16 flex-col items-center gap-1.5 relative select-none",
+          "relative select-none touch-none",
+          isEmbedMode
+            ? "flex w-[140px] flex-col items-center"
+            : "flex w-16 flex-col items-center gap-1.5",
           isDragging ? "cursor-grabbing" : "cursor-pointer active:cursor-grabbing"
         )}
         style={{ x, y }}
@@ -310,19 +361,59 @@ export const Shortcut = memo(function Shortcut({
         dragControls={dragControls}
         dragMomentum={false}
         dragElastic={0.05}
-        whileHover={isMenuOpen ? undefined : { scale: 1.05 }}
-        whileTap={isMenuOpen ? undefined : { scale: 0.96 }}
-        whileDrag={{ scale: 1.08, zIndex: 50 }}
+        whileHover={isMenuOpen || isEmbedMode ? undefined : { scale: 1.05 }}
+        whileTap={isMenuOpen ? undefined : { scale: isEmbedMode ? 0.97 : 0.96 }}
+        whileDrag={{ scale: isEmbedMode ? 1.04 : 1.08, zIndex: 50 }}
         {...dragHandlers}
         onPointerDown={(e) => {
           setIsPressed(true);
+          isLongPressTriggeredRef.current = false;
+
+          // Touch long-press handling for context menu on mobile / touchscreens
+          if (e.pointerType === 'touch') {
+            touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+            clearLongPressTimer();
+            longPressTimerRef.current = setTimeout(() => {
+              isLongPressTriggeredRef.current = true;
+              lastContextMenuTime.current = Date.now();
+              setIsPressed(false);
+              setActiveShortcutMenuId(item.id);
+              if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                try {
+                  navigator.vibrate(10);
+                } catch {}
+              }
+            }, 500);
+          }
+
           if (e.button === 0) {
             dragControls.start(e);
           }
         }}
-        onPointerUp={() => setIsPressed(false)}
-        onPointerCancel={() => setIsPressed(false)}
+        onPointerMove={(e) => {
+          if (touchStartPosRef.current && longPressTimerRef.current) {
+            const dist = Math.hypot(
+              e.clientX - touchStartPosRef.current.x,
+              e.clientY - touchStartPosRef.current.y,
+            );
+            if (dist > 8) {
+              clearLongPressTimer();
+            }
+          }
+        }}
+        onPointerUp={() => {
+          setIsPressed(false);
+          clearLongPressTimer();
+        }}
+        onPointerCancel={() => {
+          setIsPressed(false);
+          clearLongPressTimer();
+        }}
         onClick={() => {
+          if (isLongPressTriggeredRef.current) {
+            isLongPressTriggeredRef.current = false;
+            return;
+          }
           if (Date.now() - lastContextMenuTime.current < 400) {
             return;
           }
@@ -342,17 +433,27 @@ export const Shortcut = memo(function Shortcut({
           }
         }}
       >
-        <Tile
-          title={item.title}
-          url={item.url}
-          customIcon={item.customIcon}
-          accent={item.accent}
-          size="lg"
-        />
-        <span className="max-w-[4.75rem] truncate text-center text-[11px] font-normal tracking-tight text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.7)]">
-          {item.title}
-        </span>
-        <span className="sr-only">{getHostname(item.url)}</span>
+        {isEmbedMode ? (
+          <>
+            <ShortcutEmbedTile item={item} />
+            <span className="sr-only">{item.title}</span>
+            <span className="sr-only">{getHostname(item.url)}</span>
+          </>
+        ) : (
+          <>
+            <Tile
+              title={item.title}
+              url={item.url}
+              customIcon={item.customIcon}
+              accent={item.accent}
+              size="lg"
+            />
+            <span className="max-w-[4.75rem] truncate text-center text-[11px] font-normal tracking-tight text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.7)]">
+              {item.title}
+            </span>
+            <span className="sr-only">{getHostname(item.url)}</span>
+          </>
+        )}
       </motion.div>
 
       {/* Context Menu Popover */}
@@ -492,6 +593,87 @@ export const Shortcut = memo(function Shortcut({
                       <span>Reset Favicon</span>
                     </button>
                   </div>
+                )}
+
+                {/* Refresh Preview */}
+                <div className="relative">
+                  {hoveredMenuIndex === 'refresh-preview' && (
+                    <motion.div
+                      layoutId="ctx-menu-highlight"
+                      className="absolute inset-0 rounded-lg bg-white/10"
+                      transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onMouseEnter={() => setHoveredMenuIndex('refresh-preview')}
+                    onClick={handleRefreshPreview}
+                    disabled={isRefreshingPreview}
+                    className="relative flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[12px] text-white/90 text-left cursor-pointer disabled:opacity-50"
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={cn("text-white/60 shrink-0", isRefreshingPreview && "animate-spin")}
+                    >
+                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                      <path d="M16 21h5v-5" />
+                    </svg>
+                    <span>{isRefreshingPreview ? "Refreshing..." : "Refresh Preview"}</span>
+                  </button>
+                </div>
+
+                {/* Move to other space */}
+                {spacesEnabled && spaces.length > 1 && (
+                  <>
+                    <div className="my-1 border-t border-white/10" />
+                    <div className="px-2.5 py-1 text-[10.5px] font-medium text-white/40 select-none">
+                      Move to space
+                    </div>
+                    {spaces
+                      .filter((s) => s.id !== item.spaceId)
+                      .map((s) => {
+                        const menuKey = `space-${s.id}`;
+                        const isHovered = hoveredMenuIndex === menuKey;
+                        return (
+                          <div key={s.id} className="relative">
+                            {isHovered && (
+                              <motion.div
+                                layoutId="ctx-menu-highlight"
+                                className="absolute inset-0 rounded-lg bg-white/10"
+                                transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                              />
+                            )}
+                            <button
+                              type="button"
+                              onMouseEnter={() => setHoveredMenuIndex(menuKey)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateItem(item.id, { spaceId: s.id });
+                                setActiveShortcutMenuId(null);
+                              }}
+                              className="relative flex items-center gap-2.5 w-full px-2.5 py-1.5 rounded-lg text-[12px] text-white/90 text-left cursor-pointer"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/60 shrink-0">
+                                <rect width="7" height="7" x="3" y="3" rx="1" />
+                                <rect width="7" height="7" x="14" y="3" rx="1" />
+                                <rect width="7" height="7" x="14" y="14" rx="1" />
+                                <rect width="7" height="7" x="3" y="14" rx="1" />
+                              </svg>
+                              <span className="truncate">{s.name}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </>
                 )}
 
                 {/* Divider */}

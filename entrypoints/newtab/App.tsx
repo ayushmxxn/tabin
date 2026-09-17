@@ -5,8 +5,10 @@ import { Search } from "@/components/search/Search";
 import { SpaceIndicator } from "@/components/spaces/SpaceIndicator";
 import { SpaceSwitcher } from "@/components/spaces/SpaceSwitcher";
 import { Wallpaper } from "@/components/wallpaper/Wallpaper";
+import { TopLeftNotch } from "@/components/notch/TopLeftNotch";
 import { TopRightNotch } from "@/components/notch/TopRightNotch";
 import { syncStoreFromExternal, useLaunchpadStore } from "@/store/useLaunchpadStore";
+import { backfillShortcutsOgImages } from "@/lib/ogBackfill";
 import { lazy, Suspense, useEffect } from "react";
 
 const SettingsModal = lazy(() =>
@@ -25,6 +27,11 @@ export default function App() {
   const isSettingsOpen = useLaunchpadStore((state) => state.isSettingsOpen);
   const isAddModalOpen = useLaunchpadStore((state) => state.isAddModalOpen);
 
+  // Backfill OG images for existing shortcuts saved without them
+  useEffect(() => {
+    backfillShortcutsOgImages().catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (typeof chrome === "undefined" || !chrome.storage?.onChanged) return;
     const handleStorageChange = (
@@ -40,6 +47,40 @@ export default function App() {
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
 
+  // Ensure the persistent Saved Tabs pinned tab exists on the far-left of the current browser window
+  useEffect(() => {
+    if (typeof chrome === "undefined" || !chrome.tabs) return;
+    const savedTabsUrl = chrome.runtime.getURL("/saved-tabs.html");
+
+    chrome.tabs.query({ currentWindow: true }, (windowTabs) => {
+      if (chrome.runtime?.lastError || !windowTabs) return;
+      const existingInWindow = windowTabs.find(
+        (t) => t.url && t.url.startsWith(savedTabsUrl),
+      );
+
+      if (existingInWindow && existingInWindow.id) {
+        if (!existingInWindow.pinned || existingInWindow.index !== 0) {
+          chrome.tabs.update(existingInWindow.id, { pinned: true }).catch(() => {});
+          chrome.tabs.move(existingInWindow.id, { index: 0 }).catch(() => {});
+        }
+      } else {
+        chrome.tabs.create(
+          {
+            url: savedTabsUrl,
+            pinned: true,
+            active: false,
+            index: 0,
+          },
+          (newTab) => {
+            if (chrome.runtime?.lastError) {
+              console.warn("Failed to pin Saved Tabs:", chrome.runtime.lastError);
+            }
+          },
+        );
+      }
+    });
+  }, []);
+
   return (
     <div className="relative h-screen w-screen overflow-hidden font-sans select-none">
       <Wallpaper />
@@ -48,10 +89,11 @@ export default function App() {
         <Canvas />
       </main>
 
+      <TopLeftNotch />
       <TopRightNotch />
       <Search />
       <SpaceSwitcher />
-      <SpaceIndicator />
+      <SpaceIndicator standalone />
       <Dock />
       {isSettingsOpen && (
         <Suspense fallback={null}>

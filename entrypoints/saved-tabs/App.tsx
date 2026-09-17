@@ -37,7 +37,7 @@ interface TabRowProps {
   isSelected: boolean;
   hasSelection: boolean;
   isHovered: boolean;
-  onMouseEnter: (id: string) => void;
+  onMouseEnter: (id: string | null) => void;
   onDragStart: (e: React.DragEvent<HTMLLIElement>, tabId: string, groupId: string) => void;
   onToggleSelect: (id: string) => void;
   onRestore: (tab: SavedTab, groupId: string) => void;
@@ -62,7 +62,8 @@ const TabRow = memo(function TabRow({
   return (
     <li
       draggable
-      onMouseEnter={() => onMouseEnter(tab.id)}
+      onPointerEnter={() => onMouseEnter(tab.id)}
+      onPointerLeave={() => onMouseEnter(null)}
       onDragStart={(e) => onDragStart(e, tab.id, groupId)}
       className={`relative group/tab flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg cursor-grab active:cursor-grabbing ${
         isSelected ? "bg-white/[0.06]" : ""
@@ -204,31 +205,38 @@ export default function App() {
     document.title = "\u200B";
 
     if (typeof chrome !== "undefined" && chrome.tabs) {
-      chrome.tabs.getCurrent?.((tab) => {
-        if (chrome.runtime?.lastError) return;
-        if (tab?.id && !tab.pinned) {
-          chrome.tabs.update(tab.id, { pinned: true }).catch(() => {});
-        }
-      });
+      const faviconUrl = chrome.runtime.getURL("/icon-32.png");
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = faviconUrl;
 
-      // Close duplicate Saved Tabs tabs across all windows
       const savedTabsPageUrl = chrome.runtime.getURL("/saved-tabs.html");
-      chrome.tabs.query?.({}, (allTabs) => {
-        if (chrome.runtime?.lastError || !allTabs) return;
-        const matching = allTabs.filter(
+      chrome.tabs.query?.({ currentWindow: true }, (windowTabs) => {
+        if (chrome.runtime?.lastError || !windowTabs) return;
+        const matching = windowTabs.filter(
           (t) => t.id && t.url && t.url.startsWith(savedTabsPageUrl),
         );
-        if (matching.length > 1) {
-          chrome.tabs.getCurrent?.((currentTab) => {
-            if (chrome.runtime?.lastError) return;
+        if (matching.length > 0) {
+          const primary = matching[0];
+          if (primary && primary.id) {
+            if (!primary.pinned || primary.index !== 0) {
+              chrome.tabs.update(primary.id, { pinned: true }).catch(() => {});
+              chrome.tabs.move(primary.id, { index: 0 }).catch(() => {});
+            }
+          }
+          if (matching.length > 1) {
             const duplicates = matching
-              .filter((t) => t.id !== currentTab?.id)
+              .slice(1)
               .map((t) => t.id!)
               .filter(Boolean);
             if (duplicates.length > 0) {
               chrome.tabs.remove(duplicates).catch(() => {});
             }
-          });
+          }
         }
       });
     }
@@ -484,9 +492,10 @@ export default function App() {
     });
   }, []);
 
-  const handleTabMouseEnter = useCallback((id: string) => {
+  const handleTabMouseEnter = useCallback((id: string | null) => {
     setHoveredTabId(id);
   }, []);
+
 
   const handleMoveSelectedToGroup = async (toGroupId: string) => {
     const tabIds = Array.from(selectedTabIds);
@@ -604,19 +613,113 @@ export default function App() {
           </div>
         ) : groups.length === 0 ? (
           /* Empty State */
-          <div className="py-24 text-center">
-            <h2 className="text-[16px] font-medium text-white/85">
+          <div className="py-20 text-center flex flex-col items-center">
+            <h2 className="text-[16px] font-medium text-white/90 tracking-tight">
               No saved tabs yet
             </h2>
-            <p className="mt-2 text-[13px] text-white/40">
-              Save your open tabs here and come back to them anytime.
+            <p className="mt-1.5 text-[13px] text-white/40 leading-relaxed max-w-md mx-auto">
+              Click the Tabin icon in your browser toolbar to save your open tabs and come back to them anytime.
             </p>
+            {/* Coded Browser Toolbar Reference Mockup */}
+            <div className="mt-7 w-full max-w-[270px] rounded-xl border border-white/10 bg-[#19191E] shadow-2xl overflow-hidden select-none">
+              {/* Window Controls Bar */}
+              <div className="flex items-center justify-end px-3 pt-2.5 pb-2 gap-3.5">
+                {/* Minimize */}
+                <div className="w-3 h-3 flex items-center justify-center">
+                  <svg className="w-2.5 h-2.5 text-white/70" viewBox="0 0 10 10" fill="none">
+                    <path d="M1 5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+                {/* Restore / Maximize */}
+                <div className="w-3 h-3 flex items-center justify-center">
+                  <svg className="w-2.5 h-2.5 text-white/70" viewBox="0 0 10 10" fill="none">
+                    <path d="M3 1h5a1 1 0 0 1 1 1v5" stroke="currentColor" strokeWidth="1.1" />
+                    <rect x="1" y="3" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.1" />
+                  </svg>
+                </div>
+                {/* Close */}
+                <div className="w-3 h-3 flex items-center justify-center">
+                  <svg className="w-2.5 h-2.5 text-white/70" viewBox="0 0 10 10" fill="none">
+                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Toolbar Area */}
+              <div className="relative flex items-center justify-end px-3.5 py-2.5 gap-3 bg-[#131317]/80 border-t border-white/[0.04]">
+                {/* Sketchy Hand-drawn Arrow pointing directly towards the Tabin icon */}
+                <div className="absolute right-[104px] top-1/2 -translate-y-1/2 flex items-center pointer-events-none select-none">
+                  <svg
+                    className="w-16 h-6 text-[#FA1E76] overflow-visible"
+                    viewBox="0 0 64 22"
+                    fill="none"
+                    stroke="currentColor"
+                  >
+                    {/* Organic sketchy arrow shaft */}
+                    <path
+                      d="M 2 12 C 18 14.5, 38 8.5, 56 10.5"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                    <path
+                      d="M 4 11.5 C 20 13.5, 40 9, 54 11"
+                      strokeWidth="1"
+                      strokeLinecap="round"
+                      strokeOpacity="0.4"
+                    />
+                    {/* Sketchy barbed arrowhead */}
+                    <path
+                      d="M 46 4 C 50 7.5, 54 9.8, 58 10.5 C 54 12.5, 50 15.5, 45.5 18"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M 47 5 C 51 8, 55 10, 57 10.5"
+                      strokeWidth="1"
+                      strokeLinecap="round"
+                      strokeOpacity="0.5"
+                    />
+                  </svg>
+                </div>
+
+                {/* Tabin Action Icon */}
+                <div className="relative flex items-center justify-center">
+                  <img
+                    src="/icon-32.png"
+                    alt="Tabin"
+                    className="w-6 h-6 rounded-[7px] shadow-sm relative z-10"
+                  />
+                  <span className="absolute -inset-1 rounded-xl bg-[#FA1E76]/25 animate-pulse" />
+                </div>
+
+                {/* Extensions Puzzle Icon */}
+                <div className="flex items-center justify-center text-white/70">
+                  <svg className="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5s-1.12-2.5-2.5-2.5z" />
+                  </svg>
+                </div>
+
+                {/* Chrome 3-Dots Menu */}
+                <div className="flex items-center justify-center text-white/70">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.75" />
+                    <circle cx="12" cy="12" r="1.75" />
+                    <circle cx="12" cy="19" r="1.75" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Viewport bottom seam */}
+              <div className="h-5 bg-[#0C0C0F] border-t border-white/[0.06]" />
+            </div>
           </div>
         ) : (
           /* Groups List - perfectly aligned left & right */
           <div
             className="flex flex-col gap-9"
             onMouseLeave={() => setHoveredTabId(null)}
+            onPointerLeave={() => setHoveredTabId(null)}
           >
             {groups.map((group) => {
               const tabCount = group.tabs.length;

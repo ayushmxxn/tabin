@@ -34,6 +34,7 @@ export default defineConfig({
       "tabGroups",
       "unlimitedStorage",
     ],
+    host_permissions: ["https://*/*", "http://*/*"],
     optional_permissions: ["bookmarks"],
   },
 });

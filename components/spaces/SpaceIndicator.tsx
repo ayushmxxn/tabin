@@ -1,103 +1,102 @@
-import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { useLaunchpadStore } from '@/store/useLaunchpadStore';
+import { useLaunchpadStore, selectFolderChildren } from '@/store/useLaunchpadStore';
 import { useColumns, PAGE_ROWS } from '@/lib/layout';
+import type { FolderItem, LaunchpadItem, ShortcutItem } from '@/types';
 
-export function SpaceIndicator() {
+/**
+ * Clean, modern pagination indicator positioned directly above the Spaces bar / Dock.
+ * - Shows when totalPages > 1 for the active space or open folder.
+ * - Clicking a dot switches immediately to that 3-row page.
+ * - Features high-contrast, polished styling ensuring visibility across all wallpapers.
+ */
+export function SpaceIndicator({ standalone = false }: { standalone?: boolean }) {
   const items = useLaunchpadStore((state) => state.items);
   const openFolderId = useLaunchpadStore((state) => state.openFolderId);
   const activePageIndex = useLaunchpadStore((state) => state.activePageIndex);
   const setActivePageIndex = useLaunchpadStore((state) => state.setActivePageIndex);
-  const goToNextPage = useLaunchpadStore((state) => state.goToNextPage);
-  const goToPrevPage = useLaunchpadStore((state) => state.goToPrevPage);
-  const isSearchOpen = useLaunchpadStore((state) => state.isSearchOpen);
-  const isSettingsOpen = useLaunchpadStore((state) => state.isSettingsOpen);
-  const isAddModalOpen = useLaunchpadStore((state) => state.isAddModalOpen);
-
-  const columns = useColumns();
-  const pageSize = columns * PAGE_ROWS;
-
-  const topLevelShortcuts = items.filter(
-    (item) => item.type === 'shortcut' && item.folderId === null,
+  const folderPageIndex = useLaunchpadStore((state) => state.folderPageIndex);
+  const setFolderPageIndex = useLaunchpadStore((state) => state.setFolderPageIndex);
+  const spaces = useLaunchpadStore((state) => state.spaces);
+  const activeSpaceIndex = useLaunchpadStore((state) => state.activeSpaceIndex);
+  const spacesEnabled = useLaunchpadStore(
+    (state) => state.settings?.spacesEnabled ?? false,
   );
-  const totalPages = Math.max(1, Math.ceil(topLevelShortcuts.length / pageSize));
+  const gridColumns = useLaunchpadStore(
+    (state) => state.settings?.gridColumns ?? 'auto',
+  );
+  const shortcutStyle = useLaunchpadStore(
+    (state) => state.settings?.shortcutStyle ?? 'icons',
+  );
+  const isEmbedMode = shortcutStyle === 'embeds';
 
-  // Keyboard navigation
-  useEffect(() => {
-    if (isSearchOpen || openFolderId !== null || isSettingsOpen || isAddModalOpen) return;
-    if (totalPages <= 1) return;
+  const activeSpace = spaces[activeSpaceIndex] ?? spaces[0] ?? { id: 'space-home', name: 'Home' };
+  const activeFolder = openFolderId
+    ? items.find((item): item is FolderItem => item.type === 'folder' && item.id === openFolderId)
+    : null;
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'ArrowRight') goToNextPage(totalPages);
-      if (event.key === 'ArrowLeft') goToPrevPage();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [totalPages, isSearchOpen, openFolderId, isSettingsOpen, isAddModalOpen, goToNextPage, goToPrevPage]);
+  const isFolderActive = Boolean(activeFolder);
 
-  // Mouse wheel navigation:
-  // Wheel down / scroll right -> next screen (active dot moves to the right)
-  // Wheel up / scroll left -> prev screen (active dot moves to the left)
-  useEffect(() => {
-    if (isSearchOpen || openFolderId !== null || isSettingsOpen || isAddModalOpen) return;
-    if (totalPages <= 1) return;
+  // Resolved list of shortcuts for current view (Space or Folder)
+  const displayItems = activeFolder
+    ? selectFolderChildren(items, activeFolder)
+    : items.filter(
+        (item): item is ShortcutItem =>
+          item.type === 'shortcut' &&
+          item.folderId === null &&
+          (!spacesEnabled || (item.spaceId || 'space-home') === activeSpace.id),
+      );
 
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let accumulatedDelta = 0;
+  const columns = useColumns(gridColumns, isEmbedMode);
+  const maxRows = PAGE_ROWS; // Strictly 3 rows
+  const pageSize = Math.max(1, columns * maxRows);
+  const totalPages = Math.max(1, Math.ceil(displayItems.length / pageSize));
 
-    const onWheel = (e: WheelEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest?.('[role="dialog"]') || target?.closest?.('[data-modal]')) return;
+  const currentPage = isFolderActive ? folderPageIndex : activePageIndex;
+  const setCurrentPage = isFolderActive ? setFolderPageIndex : setActivePageIndex;
+  const safePage = Math.min(Math.max(currentPage, 0), totalPages - 1);
 
-      const primaryDelta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-      if (Math.abs(primaryDelta) < 10) return;
+  // If standalone but spaces are enabled, SpaceSwitcher renders it at the top of the spaces toggle
+  if (standalone && spacesEnabled) return null;
 
-      accumulatedDelta += primaryDelta;
+  // Only show pagination dots when more than 1 page is required
+  if (totalPages <= 1) return null;
 
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        accumulatedDelta = 0;
-      }, 250);
-
-      if (accumulatedDelta > 35) {
-        accumulatedDelta = 0;
-        goToNextPage(totalPages);
-      } else if (accumulatedDelta < -35) {
-        accumulatedDelta = 0;
-        goToPrevPage();
-      }
-    };
-
-    window.addEventListener('wheel', onWheel, { passive: true });
-    return () => {
-      window.removeEventListener('wheel', onWheel);
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [totalPages, isSearchOpen, openFolderId, isSettingsOpen, isAddModalOpen, goToNextPage, goToPrevPage]);
-
-  // Only show dots when available space on screen gets completely filled (multiple pages exist)
-  if (openFolderId !== null || totalPages <= 1) return null;
-
-  return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-24 z-20 flex justify-center gap-1.5">
-      {Array.from({ length: totalPages }).map((_, index) => (
-        <button
-          key={index}
-          aria-label={`Go to screen ${index + 1}`}
-          aria-current={index === activePageIndex}
-          onClick={() => setActivePageIndex(index)}
-          className="p-1.5 cursor-pointer"
-        >
-          <span
-            className={cn(
-              'block h-1.5 w-1.5 rounded-full transition-all duration-200',
-              index === activePageIndex
-                ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)] scale-125'
-                : 'bg-white/30 hover:bg-white/50',
-            )}
-          />
-        </button>
-      ))}
+  const dots = (
+    <div className="pointer-events-auto flex items-center gap-1.5 py-0.5">
+      {Array.from({ length: totalPages }).map((_, index) => {
+        const isActive = index === safePage;
+        return (
+          <button
+            key={index}
+            type="button"
+            aria-label={`Go to page ${index + 1}`}
+            aria-current={isActive}
+            title={`Page ${index + 1} of ${totalPages}`}
+            onClick={() => setCurrentPage(index)}
+            className="p-1 cursor-pointer group/dot focus:outline-none flex items-center justify-center transition-transform hover:scale-125"
+          >
+            <span
+              className={cn(
+                "block rounded-full transition-all duration-200",
+                isActive
+                  ? "w-2 h-2 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.7)]"
+                  : "w-2 h-2 bg-white/40 group-hover/dot:bg-white/80 shadow-[0_1px_3px_rgba(0,0,0,0.6)]",
+              )}
+            />
+          </button>
+        );
+      })}
     </div>
   );
+
+  if (standalone) {
+    return (
+      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center select-none">
+        {dots}
+      </div>
+    );
+  }
+
+  return dots;
 }
+

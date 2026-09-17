@@ -31,6 +31,8 @@ export interface ShortcutItem extends BaseItem {
   url: string;
   /** Optional custom uploaded favicon data URL or image URL */
   customIcon?: string | null;
+  /** Optional resolved Open Graph / preview image URL */
+  ogImage?: string | null;
 }
 
 export interface FolderItem extends BaseItem {
@@ -80,6 +82,8 @@ export type GridColumnsMode = 'auto' | '6' | '7' | '8' | '10';
 
 export type OpenLinksMode = 'newTab' | 'sameTab';
 
+export type ShortcutStyleMode = 'icons' | 'embeds';
+
 export interface LaunchpadSettings {
   gridColumns: GridColumnsMode;
   iconScale: 'compact' | 'standard' | 'large';
@@ -89,4 +93,5 @@ export interface LaunchpadSettings {
   spacesEnabled?: boolean;
   defaultSpaceId?: string;
   openLinks?: OpenLinksMode;
+  shortcutStyle?: ShortcutStyleMode;
 }

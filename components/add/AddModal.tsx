@@ -1,4 +1,4 @@
-import { fetchFavicon } from "@/lib/fetchFavicon";
+import { fetchWebsiteMetadata } from "@/lib/fetchMetadata";
 import { DEFAULT_FOLDER_COLOR } from "@/lib/folderColors";
 import { cn, getFaviconUrl, getHostname } from "@/lib/utils";
 import { selectSpaceItems, useLaunchpadStore } from "@/store/useLaunchpadStore";
@@ -140,10 +140,17 @@ export function AddModal() {
 
     setAddModalOpen(false);
 
-    fetchFavicon(finalUrl)
-      .then((faviconUrl) => {
-        if (faviconUrl) {
-          updateItem(id, { customIcon: faviconUrl });
+    fetchWebsiteMetadata(finalUrl)
+      .then((meta) => {
+        const updates: Record<string, unknown> = {};
+        if (meta.ogImage) {
+          updates.ogImage = meta.ogImage;
+        }
+        if (meta.favicon) {
+          updates.customIcon = meta.favicon;
+        }
+        if (Object.keys(updates).length > 0) {
+          updateItem(id, updates);
         }
       })
       .catch(() => {});

@@ -7,7 +7,7 @@ interface TileProps {
   url?: string;
   customIcon?: string | null;
   accent: AccentToken;
-  size?: "lg" | "md" | "sm";
+  size?: "lg" | "md" | "sm" | "xs";
   className?: string;
   /** Render children instead of a favicon/initial — used for folder previews. */
   children?: React.ReactNode;
@@ -17,6 +17,7 @@ const SIZE_CLASSES: Record<NonNullable<TileProps["size"]>, string> = {
   lg: "h-12 w-12",
   md: "h-10 w-10",
   sm: "h-7 w-7",
+  xs: "h-4 w-4",
 };
 
 export const Tile = memo(function Tile({

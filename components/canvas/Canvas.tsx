@@ -6,13 +6,16 @@ import {
   selectFolderChildren,
 } from '@/store/useLaunchpadStore';
 import { useCanvasGrid, resolveItemPosition, PAGE_ROWS } from '@/lib/layout';
+import { cn } from '@/lib/utils';
 import type { FolderItem, LaunchpadItem, ShortcutItem } from '@/types';
 
 /**
  * The main canvas surface for the active destination (Home or Folder).
- * When viewing Home, it renders shortcuts in dynamic screens with page capacity.
- * When a screen completely fills up, icons spill over to the second screen.
- * When viewing a folder, it renders nested shortcuts and subfolders with breadcrumb navigation.
+ * In Embeds mode:
+ * - Shows a maximum of 3 rows of shortcuts at a time.
+ * - Paginates additional shortcuts into 3-row pages.
+ * - Supports pagination dots and mouse wheel scrolling over the Embed area.
+ * - Keeps the current page and transitions between pages smoothly.
  */
 export function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -24,19 +27,26 @@ export function Canvas() {
   const closeFolder = useLaunchpadStore((state) => state.closeFolder);
   const activePageIndex = useLaunchpadStore((state) => state.activePageIndex);
   const setActivePageIndex = useLaunchpadStore((state) => state.setActivePageIndex);
+  const folderPageIndex = useLaunchpadStore((state) => state.folderPageIndex);
+  const setFolderPageIndex = useLaunchpadStore((state) => state.setFolderPageIndex);
   const setAddModalOpen = useLaunchpadStore((state) => state.setAddModalOpen);
+  const isSearchOpen = useLaunchpadStore((state) => state.isSearchOpen);
+  const isSettingsOpen = useLaunchpadStore((state) => state.isSettingsOpen);
+  const isAddModalOpen = useLaunchpadStore((state) => state.isAddModalOpen);
   const spaces = useLaunchpadStore((state) => state.spaces);
   const activeSpaceIndex = useLaunchpadStore((state) => state.activeSpaceIndex);
   const spacesEnabled = useLaunchpadStore((state) => state.settings?.spacesEnabled ?? false);
   const activeSpace = spaces[activeSpaceIndex] ?? spaces[0] ?? { id: 'space-home', name: 'Home' };
 
-  const { columns } = useCanvasGrid(canvasRef, gridColumns);
-
+  const shortcutStyle = useLaunchpadStore((state) => state.settings?.shortcutStyle ?? 'icons');
   const activeFolder = openFolderId
     ? items.find((item): item is FolderItem => item.type === 'folder' && item.id === openFolderId)
     : null;
 
   const isFolderActive = Boolean(activeFolder);
+  const isEmbedMode = shortcutStyle === 'embeds';
+
+  const { columns, containerWidth, containerHeight } = useCanvasGrid(canvasRef, gridColumns, isEmbedMode);
 
   // Canvas right-click context menu state
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
@@ -69,28 +79,20 @@ export function Canvas() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setCtxMenu(null);
     };
-    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('keydown', onKeyDown);
     return () => {
-      window.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown);
     };
   }, [ctxMenu]);
 
-  // Native document-level contextmenu listener — avoids the React e.target vs
-  // e.currentTarget mismatch caused by the inner motion.div covering the canvas.
-  // Shortcuts already call e.stopPropagation(), so only true empty-space clicks
-  // reach the document listener within the canvas bounds.
+  // Native document-level contextmenu listener and touch long-press on empty canvas
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-
-      // Only handle events within the canvas
       if (!canvasRef.current?.contains(target)) return;
 
-      // If the click is on/inside any interactive Tabin element, let it be
-      // (Shortcut handles its own contextmenu and stops propagation; this
-      // handles folder buttons and any other interactive descendants)
       if (
         target.closest('[data-tile-id]') ||
         target.closest('[data-folder-item]') ||
@@ -101,7 +103,6 @@ export function Canvas() {
         return;
       }
 
-      // Empty canvas space — take over
       e.preventDefault();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -112,8 +113,76 @@ export function Canvas() {
       setCtxMenu({ x, y });
     };
 
+    const canvasEl = canvasRef.current;
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    let touchOrigin: { x: number; y: number } | null = null;
+
+    const onPointerDownCanvas = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest('[data-tile-id]') ||
+        target?.closest('[data-folder-item]') ||
+        target?.closest('button') ||
+        target?.closest('a') ||
+        target?.closest('input') ||
+        target?.closest('[role="dialog"]')
+      ) {
+        return;
+      }
+      touchOrigin = { x: e.clientX, y: e.clientY };
+      if (longPressTimer) clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const menuW = 184;
+        const menuH = 44;
+        const x = Math.min(e.clientX, vw - menuW - 8);
+        const y = Math.min(e.clientY, vh - menuH - 8);
+        setCtxMenu({ x, y });
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try {
+            navigator.vibrate(10);
+          } catch {}
+        }
+      }, 500);
+    };
+
+    const onPointerMoveCanvas = (e: PointerEvent) => {
+      if (touchOrigin && longPressTimer) {
+        const dist = Math.hypot(e.clientX - touchOrigin.x, e.clientY - touchOrigin.y);
+        if (dist > 8) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+      }
+    };
+
+    const onPointerUpCanvas = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
     document.addEventListener('contextmenu', handleContextMenu);
-    return () => document.removeEventListener('contextmenu', handleContextMenu);
+    if (canvasEl) {
+      canvasEl.addEventListener('pointerdown', onPointerDownCanvas);
+      canvasEl.addEventListener('pointermove', onPointerMoveCanvas);
+      canvasEl.addEventListener('pointerup', onPointerUpCanvas);
+      canvasEl.addEventListener('pointercancel', onPointerUpCanvas);
+    }
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      if (canvasEl) {
+        canvasEl.removeEventListener('pointerdown', onPointerDownCanvas);
+        canvasEl.removeEventListener('pointermove', onPointerMoveCanvas);
+        canvasEl.removeEventListener('pointerup', onPointerUpCanvas);
+        canvasEl.removeEventListener('pointercancel', onPointerUpCanvas);
+      }
+      if (longPressTimer) clearTimeout(longPressTimer);
+    };
   }, []);
 
   const displayItems = useMemo<LaunchpadItem[]>(() => {
@@ -123,23 +192,31 @@ export function Canvas() {
           (item): item is ShortcutItem =>
             item.type === 'shortcut' &&
             item.folderId === null &&
-            (!spacesEnabled || item.spaceId === activeSpace.id),
+            (!spacesEnabled || (item.spaceId || 'space-home') === activeSpace.id),
         );
   }, [items, activeFolder, spacesEnabled, activeSpace.id]);
 
-  const pageSize = columns * PAGE_ROWS;
-  const totalPages = isFolderActive ? 1 : Math.max(1, Math.ceil(displayItems.length / pageSize));
-  const safePageIndex = isFolderActive ? 0 : Math.min(Math.max(activePageIndex, 0), totalPages - 1);
+  // Show a maximum of 3 rows of shortcuts at a time. Never allow grid to exceed 3 rows.
+  const maxRows = PAGE_ROWS; // 3 rows
+  const pageSize = Math.max(1, columns * maxRows);
+  const totalPages = Math.max(1, Math.ceil(displayItems.length / pageSize));
 
+  const currentPageIndex = isFolderActive ? folderPageIndex : activePageIndex;
+  const setCurrentPageIndex = isFolderActive ? setFolderPageIndex : setActivePageIndex;
+  const safePageIndex = Math.min(Math.max(currentPageIndex, 0), totalPages - 1);
+
+  // Sync state if bounds change
   useEffect(() => {
-    if (!isFolderActive && activePageIndex !== safePageIndex) {
-      setActivePageIndex(safePageIndex);
+    if (currentPageIndex !== safePageIndex) {
+      setCurrentPageIndex(safePageIndex);
     }
-  }, [isFolderActive, activePageIndex, safePageIndex, setActivePageIndex]);
+  }, [currentPageIndex, safePageIndex, setCurrentPageIndex]);
 
-  const pageItems = isFolderActive
-    ? displayItems
-    : displayItems.slice(safePageIndex * pageSize, (safePageIndex + 1) * pageSize);
+  // Strictly slice display items so that at most 3 rows are rendered per page
+  const pageItems = displayItems.slice(
+    safePageIndex * pageSize,
+    (safePageIndex + 1) * pageSize,
+  );
 
   const prevPageRef = useRef(safePageIndex);
   const pageDirection = safePageIndex >= prevPageRef.current ? 1 : -1;
@@ -147,8 +224,137 @@ export function Canvas() {
     prevPageRef.current = safePageIndex;
   }, [safePageIndex]);
 
+  // Mouse wheel navigation over the Embed area to switch pages smoothly
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || totalPages <= 1) return;
+
+    let isThrottled = false;
+    let accumulatedDelta = 0;
+    let resetTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleWheel = (e: WheelEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[role="dialog"]') || target?.closest?.('[data-modal]')) return;
+
+      const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (Math.abs(delta) < 8) return;
+
+      e.preventDefault();
+      accumulatedDelta += delta;
+
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => {
+        accumulatedDelta = 0;
+      }, 200);
+
+      if (isThrottled) return;
+
+      const threshold = 30;
+      if (accumulatedDelta > threshold) {
+        if (safePageIndex < totalPages - 1) {
+          isThrottled = true;
+          accumulatedDelta = 0;
+          setCurrentPageIndex(safePageIndex + 1);
+          setTimeout(() => {
+            isThrottled = false;
+          }, 280);
+        }
+      } else if (accumulatedDelta < -threshold) {
+        if (safePageIndex > 0) {
+          isThrottled = true;
+          accumulatedDelta = 0;
+          setCurrentPageIndex(safePageIndex - 1);
+          setTimeout(() => {
+            isThrottled = false;
+          }, 280);
+        }
+      }
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      if (resetTimer) clearTimeout(resetTimer);
+    };
+  }, [totalPages, safePageIndex, setCurrentPageIndex]);
+
+  // Touch swipe navigation over the canvas to switch pages smoothly on touch devices
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || totalPages <= 1) return;
+
+    let startX = 0;
+    let startY = 0;
+    let isTracking = false;
+    let isSwipeThrottled = false;
+
+    const onTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[role="dialog"]') || target?.closest?.('[data-modal]')) return;
+      if (e.touches.length === 1) {
+        startX = e.touches[0]!.clientX;
+        startY = e.touches[0]!.clientY;
+        isTracking = true;
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isTracking || isSwipeThrottled || e.changedTouches.length === 0) {
+        isTracking = false;
+        return;
+      }
+      isTracking = false;
+      const endX = e.changedTouches[0]!.clientX;
+      const endY = e.changedTouches[0]!.clientY;
+      const diffX = endX - startX;
+      const diffY = endY - startY;
+
+      // Detect prominent horizontal swipe gesture
+      if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
+        if (diffX < 0 && safePageIndex < totalPages - 1) {
+          isSwipeThrottled = true;
+          setCurrentPageIndex(safePageIndex + 1);
+          setTimeout(() => {
+            isSwipeThrottled = false;
+          }, 280);
+        } else if (diffX > 0 && safePageIndex > 0) {
+          isSwipeThrottled = true;
+          setCurrentPageIndex(safePageIndex - 1);
+          setTimeout(() => {
+            isSwipeThrottled = false;
+          }, 280);
+        }
+      }
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [totalPages, safePageIndex, setCurrentPageIndex]);
+
+  // Keyboard left/right arrow navigation
+  useEffect(() => {
+    if (isSearchOpen || isSettingsOpen || isAddModalOpen || totalPages <= 1) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' && safePageIndex < totalPages - 1) {
+        setCurrentPageIndex(safePageIndex + 1);
+      }
+      if (e.key === 'ArrowLeft' && safePageIndex > 0) {
+        setCurrentPageIndex(safePageIndex - 1);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSearchOpen, isSettingsOpen, isAddModalOpen, totalPages, safePageIndex, setCurrentPageIndex]);
+
   const destinationKey = activeFolder
-    ? `folder-${activeFolder.id}`
+    ? `folder-${activeFolder.id}-page-${safePageIndex}`
     : `space-${spacesEnabled ? activeSpace.id : 'all'}-screen-${safePageIndex}`;
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -171,27 +377,52 @@ export function Canvas() {
       onClick={handleCanvasClick}
       className="pointer-events-auto relative h-full w-full select-none overflow-visible"
     >
-
       <AnimatePresence initial={false} mode="wait" custom={pageDirection}>
         <motion.div
           key={destinationKey}
           custom={pageDirection}
           className="absolute inset-0 overflow-visible"
-          initial={
-            isFolderActive
-              ? { opacity: 1 }
-              : { opacity: 0, x: pageDirection * 40 }
-          }
+          initial={{ opacity: 0, x: pageDirection * 48 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={
-            isFolderActive
-              ? { opacity: 0, transition: { duration: 0.18 } }
-              : { opacity: 0, x: pageDirection * -40, transition: { duration: 0.18 } }
-          }
-          transition={{ duration: 0.22, ease: "easeOut" }}
+          exit={{ opacity: 0, x: pageDirection * -48, transition: { duration: 0.18 } }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         >
+          {pageItems.length === 0 && !isFolderActive && (
+            <div className="flex h-full w-full flex-col items-center justify-center pointer-events-none select-none">
+              <div className="flex flex-col items-center text-center max-w-sm px-6 py-8 rounded-2xl bg-[#141414]/60 border border-white/10 backdrop-blur-xl shadow-2xl">
+                <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-white/60 mb-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.1)]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="7" height="7" x="3" y="3" rx="1" />
+                    <rect width="7" height="7" x="14" y="3" rx="1" />
+                    <rect width="7" height="7" x="14" y="14" rx="1" />
+                    <rect width="7" height="7" x="3" y="14" rx="1" />
+                  </svg>
+                </div>
+                <h3 className="text-[14px] font-medium text-white/90">
+                  {spacesEnabled ? `${activeSpace.name} Space is empty` : "No shortcuts yet"}
+                </h3>
+                <p className="mt-1 text-[12px] text-white/40 leading-relaxed">
+                  {spacesEnabled
+                    ? "Add shortcuts to this space, or switch back to Home below."
+                    : "Add your favorite websites to get started."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAddModalOpen(true)}
+                  className="mt-4 pointer-events-auto inline-flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/15 px-3.5 py-1.5 text-[12px] font-medium text-white transition-colors cursor-pointer"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>Add shortcut</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {pageItems.map((item, pageItemIndex) => {
-            const position = resolveItemPosition(item, pageItemIndex, columns);
+            const position = resolveItemPosition(item, pageItemIndex, columns, isEmbedMode, containerWidth, containerHeight);
             const globalIndex = isFolderActive ? pageItemIndex : safePageIndex * pageSize + pageItemIndex;
 
             if (item.type === 'folder') {

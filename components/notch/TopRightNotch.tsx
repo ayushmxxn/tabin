@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef, useMemo, memo } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 interface NotchTodo {
   id: string;
@@ -87,7 +87,11 @@ function parseTimeString(time24: string) {
   return { h12, minute: m, period };
 }
 
-function toTimeString(h12: number, minute: number, period: "AM" | "PM"): string {
+function toTimeString(
+  h12: number,
+  minute: number,
+  period: "AM" | "PM",
+): string {
   let h24 = h12 % 12;
   if (period === "PM") {
     h24 += 12;
@@ -135,7 +139,7 @@ const SimpleTimeDropdown = memo(function SimpleTimeDropdown({
 
   useEffect(() => {
     const selectedEl = listRef.current?.querySelector<HTMLElement>(
-      "[data-selected='true']"
+      "[data-selected='true']",
     );
     if (selectedEl) {
       selectedEl.scrollIntoView({ block: "center", behavior: "instant" });
@@ -205,8 +209,11 @@ export const TopRightNotch = memo(function TopRightNotch() {
   const [hasTimeRange, setHasTimeRange] = useState(false);
   const [startTime, setStartTime] = useState("15:00");
   const [endTime, setEndTime] = useState("15:30");
-  const [activeTimePicker, setActiveTimePicker] = useState<"start" | "end" | null>(null);
+  const [activeTimePicker, setActiveTimePicker] = useState<
+    "start" | "end" | null
+  >(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [hoveredTodoId, setHoveredTodoId] = useState<string | null>(null);
 
   const handleStartTimeChange = (newStart: string) => {
     setStartTime(newStart);
@@ -221,7 +228,9 @@ export const TopRightNotch = memo(function TopRightNotch() {
 
     if (endMins <= startMins) {
       const nextTotal = (startMins + 30) % (24 * 60);
-      const nextH = Math.floor(nextTotal / 60).toString().padStart(2, "0");
+      const nextH = Math.floor(nextTotal / 60)
+        .toString()
+        .padStart(2, "0");
       const nextM = (nextTotal % 60).toString().padStart(2, "0");
       setEndTime(`${nextH}:${nextM}`);
     }
@@ -232,14 +241,14 @@ export const TopRightNotch = memo(function TopRightNotch() {
 
   useEffect(() => {
     if (!activeTimePicker) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: PointerEvent | MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest("[data-time-picker]")) {
         setActiveTimePicker(null);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [activeTimePicker]);
 
   const computedTime = useMemo(() => {
@@ -294,6 +303,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
   };
 
   const handleMouseLeave = () => {
+    setHoveredTodoId(null);
     if (isInputFocused || activeTimePicker !== null) return;
     timeoutRef.current = setTimeout(() => {
       setIsHovered(false);
@@ -310,6 +320,9 @@ export const TopRightNotch = memo(function TopRightNotch() {
   };
 
   const deleteTodo = (id: string) => {
+    if (hoveredTodoId === id) {
+      setHoveredTodoId(null);
+    }
     const updated = todos.filter((t) => t.id !== id);
     persistTodos(updated);
   };
@@ -349,7 +362,6 @@ export const TopRightNotch = memo(function TopRightNotch() {
     weekday: "short",
   });
 
-
   const showExpanded = isHovered || isInputFocused || activeTimePicker !== null;
 
   return (
@@ -366,7 +378,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
           stiffness: 420,
           damping: 32,
         }}
-        className="relative bg-[#121214]/95 border-b border-x border-white/12 shadow-[0_24px_60px_-10px_rgba(0,0,0,0.75),inset_0_1px_0_0_rgba(255,255,255,0.1)] rounded-b-[24px] backdrop-blur-3xl"
+        className="relative bg-[#121214]/95 shadow-[0_24px_60px_-10px_rgba(0,0,0,0.75)] rounded-b-[24px] backdrop-blur-3xl"
         style={{
           width: showExpanded ? 360 : "auto",
           maxWidth: "calc(100vw - 32px)",
@@ -379,12 +391,6 @@ export const TopRightNotch = memo(function TopRightNotch() {
           aria-hidden="true"
         >
           <path d="M12 0 H0 C6.627 0 12 5.373 12 12 V0 Z" fill="currentColor" />
-          <path
-            d="M0 0 C6.627 0 12 5.373 12 12"
-            fill="none"
-            stroke="rgba(255,255,255,0.12)"
-            strokeWidth="1"
-          />
         </svg>
 
         {/* Right concave fillet ear */}
@@ -394,17 +400,14 @@ export const TopRightNotch = memo(function TopRightNotch() {
           aria-hidden="true"
         >
           <path d="M0 0 H12 C5.373 0 0 5.373 0 12 V0 Z" fill="currentColor" />
-          <path
-            d="M12 0 C5.373 0 0 5.373 0 12"
-            fill="none"
-            stroke="rgba(255,255,255,0.12)"
-            strokeWidth="1"
-          />
         </svg>
 
         {/* Collapsed State: Time and Date only */}
         {!showExpanded && (
-          <div className="flex items-center gap-2 px-3.5 py-1.5 whitespace-nowrap cursor-pointer">
+          <div
+            onClick={() => setIsHovered(true)}
+            className="flex items-center gap-2 px-3.5 py-1.5 whitespace-nowrap cursor-pointer"
+          >
             <span className="text-[12.5px] font-semibold text-white/90 tracking-tight">
               {formattedTime}
             </span>
@@ -425,9 +428,9 @@ export const TopRightNotch = memo(function TopRightNotch() {
             className="p-3 pb-4"
           >
             {/* Header: Title & Action */}
-            <div className="flex items-center justify-between px-1 pb-2.5 border-b border-white/[0.08]">
+            <div className="flex items-center justify-between px-1.5 pb-2.5 border-b border-white/[0.08]">
               <h3 className="text-[14px] font-semibold text-white/95 tracking-tight">
-                Today's To Do
+                Tasks
               </h3>
               <button
                 type="button"
@@ -456,7 +459,10 @@ export const TopRightNotch = memo(function TopRightNotch() {
             </div>
 
             {/* To-Do Items List */}
-            <div className="pt-2 space-y-0.5 max-h-[280px] overflow-y-auto no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              onMouseLeave={() => setHoveredTodoId(null)}
+              className="pt-2 px-1 space-y-1 max-h-[280px] overflow-y-auto touch-pan-y no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {todos.length === 0 ? (
                 <div className="py-6 text-center text-white/35 text-[12px]">
                   No tasks yet today. Tap + to add one.
@@ -466,9 +472,22 @@ export const TopRightNotch = memo(function TopRightNotch() {
                   return (
                     <div
                       key={todo.id}
-                      className="group flex items-center justify-between gap-2.5 min-h-[38px] py-1.5 px-2 rounded-xl hover:bg-white/[0.06] active:bg-white/[0.10] transition-colors cursor-pointer"
+                      onMouseEnter={() => setHoveredTodoId(todo.id)}
                       onClick={() => toggleTodo(todo.id)}
+                      className="group relative flex items-center justify-between gap-2.5 min-h-[38px] py-1.5 px-2.5 rounded-xl cursor-pointer"
                     >
+                      {hoveredTodoId === todo.id && (
+                        <motion.div
+                          layoutId="notch-tasks-liquid-highlight"
+                          className="absolute inset-0 rounded-xl bg-white/[0.06] ring-1 ring-inset ring-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] pointer-events-none"
+                          transition={{
+                            type: "spring",
+                            stiffness: 400,
+                            damping: 35,
+                          }}
+                        />
+                      )}
+
                       {/* Left: Squircle Checkbox Indicator */}
                       <button
                         type="button"
@@ -476,12 +495,16 @@ export const TopRightNotch = memo(function TopRightNotch() {
                           e.stopPropagation();
                           toggleTodo(todo.id);
                         }}
-                        className={`relative h-4 w-4 shrink-0 rounded-[5px] border transition-all flex items-center justify-center cursor-pointer active:scale-90 ${
+                        className={`relative z-10 h-4 w-4 shrink-0 rounded-[5px] border transition-all flex items-center justify-center cursor-pointer active:scale-90 ${
                           todo.completed
                             ? "bg-[#FA1E76] border-[#FA1E76] text-white shadow-[0_0_8px_rgba(250,30,118,0.4)]"
                             : "border-white/25 hover:border-[#FA1E76]/80 bg-white/[0.04]"
                         }`}
-                        title={todo.completed ? "Mark as active" : "Mark as completed"}
+                        title={
+                          todo.completed
+                            ? "Mark as active"
+                            : "Mark as completed"
+                        }
                       >
                         {todo.completed && (
                           <svg
@@ -500,7 +523,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                       </button>
 
                       {/* Middle: Title & Time Subtitle */}
-                      <div className="flex-1 min-w-0 py-0.5">
+                      <div className="relative z-10 flex-1 min-w-0 py-0.5">
                         <p
                           className={`text-[12.5px] font-medium tracking-tight truncate leading-snug transition-all ${
                             todo.completed
@@ -510,18 +533,18 @@ export const TopRightNotch = memo(function TopRightNotch() {
                         >
                           {todo.title}
                         </p>
-                        {todo.time && todo.time.includes(" - ") && !todo.time.includes("Later") && (
-                          <p className="text-[10.5px] text-white/40 tracking-tight mt-0.5 truncate leading-snug">
-                            {todo.time}
-                          </p>
-                        )}
+                        {todo.time &&
+                          todo.time.includes(" - ") &&
+                          !todo.time.includes("Later") && (
+                            <p className="text-[10.5px] text-white/40 tracking-tight mt-0.5 truncate leading-snug">
+                              {todo.time}
+                            </p>
+                          )}
                       </div>
 
                       {/* Right: Squircle Duration badge & delete action */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span
-                          className="inline-flex items-center rounded-md border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-colors"
-                        >
+                      <div className="relative z-10 flex items-center gap-1.5 shrink-0">
+                        <span className="inline-flex items-center rounded-md border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-colors">
                           {todo.duration || "Anytime"}
                         </span>
 
@@ -573,7 +596,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
                       placeholder="What's next? (e.g. Design review)"
-                      className="min-w-0 flex-1 h-[34px] rounded-[9px] bg-white/[0.06] border border-white/12 px-3 text-[12px] text-white placeholder-white/35 focus:border-[#FA1E76]/70 focus:ring-1 focus:ring-[#FA1E76]/30 focus:outline-none transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
+                      className="min-w-0 flex-1 h-[34px] rounded-[9px] bg-white/[0.06] border border-white/12 px-3 text-[12px] text-white placeholder-white/35 focus:outline-none focus:ring-0 transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
                     />
                     <button
                       type="submit"
@@ -617,7 +640,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                             type="button"
                             onClick={() =>
                               setActiveTimePicker(
-                                activeTimePicker === "start" ? null : "start"
+                                activeTimePicker === "start" ? null : "start",
                               )
                             }
                             className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium border whitespace-nowrap shrink-0 transition-all cursor-pointer ${
@@ -656,14 +679,16 @@ export const TopRightNotch = memo(function TopRightNotch() {
                           </AnimatePresence>
                         </div>
 
-                        <span className="text-white/35 text-[11px] font-medium select-none px-0.5">to</span>
+                        <span className="text-white/35 text-[11px] font-medium select-none px-0.5">
+                          to
+                        </span>
 
                         <div className="relative" data-time-picker="end">
                           <button
                             type="button"
                             onClick={() =>
                               setActiveTimePicker(
-                                activeTimePicker === "end" ? null : "end"
+                                activeTimePicker === "end" ? null : "end",
                               )
                             }
                             className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium border whitespace-nowrap shrink-0 transition-all cursor-pointer ${

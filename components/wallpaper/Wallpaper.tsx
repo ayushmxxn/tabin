@@ -80,11 +80,11 @@ export function Wallpaper() {
   const preset = PRESET_WALLPAPERS.find((p) => p.id === wallpaper?.presetId) ?? PRESET_WALLPAPERS[0];
   const staticImageSrc = wallpaper?.type === 'custom' && wallpaper?.customDataUrl
     ? wallpaper.customDataUrl
-    : (preset?.url ?? '/wallpapers/monterey.jpg');
+    : (preset?.url ?? '/wallpapers/sonoma.jpg');
 
   const isLiveActive = wallpaper?.type === 'video' && videoSrc && !videoError;
 
-  const blurAmount = Math.max(0, Math.min(wallpaper.blur ?? 0, 30));
+  const blurAmount = Math.max(0, Math.min(wallpaper.blur ?? 10, 30));
   const darknessAmount = Math.max(0, Math.min(wallpaper.darkness ?? 0.15, 0.75));
 
   return (

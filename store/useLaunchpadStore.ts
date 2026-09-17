@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: LaunchpadSettings = {
   spacesEnabled: false,
   defaultSpaceId: 'space-home',
   openLinks: 'newTab',
+  shortcutStyle: 'icons',
 };
 
 export interface DeletionRecord {
@@ -72,6 +73,8 @@ interface LaunchpadState {
   setActivePageIndex: (index: number) => void;
   goToNextPage: (maxPages?: number) => void;
   goToPrevPage: () => void;
+  folderPageIndex: number;
+  setFolderPageIndex: (index: number) => void;
 
   // Spaces
   setActiveSpaceIndex: (index: number) => void;
@@ -94,6 +97,7 @@ interface LaunchpadState {
     accent?: AccentToken;
     addToDock?: boolean;
     customIcon?: string | null;
+    ogImage?: string | null;
   }) => string;
   addFolder: (params: {
     title: string;
@@ -283,21 +287,25 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
       activePageIndex: 0,
       setActivePageIndex: (index) =>
-        set({ activePageIndex: Math.max(0, index), openFolderId: null }),
+        set({ activePageIndex: Math.max(0, index) }),
       goToNextPage: (maxPages) => {
         const { activePageIndex } = get();
         if (maxPages === undefined || activePageIndex < maxPages - 1) {
           const next = activePageIndex + 1;
-          set({ activePageIndex: next, openFolderId: null });
+          set({ activePageIndex: next });
         }
       },
       goToPrevPage: () => {
         const { activePageIndex } = get();
         if (activePageIndex > 0) {
           const prev = activePageIndex - 1;
-          set({ activePageIndex: prev, openFolderId: null });
+          set({ activePageIndex: prev });
         }
       },
+
+      folderPageIndex: 0,
+      setFolderPageIndex: (index) =>
+        set({ folderPageIndex: Math.max(0, index) }),
 
       setActiveSpaceIndex: (index) => {
         const clamped = Math.max(0, Math.min(index, get().spaces.length - 1));
@@ -414,7 +422,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         }));
       },
 
-      addShortcut: ({ title, url, spaceId, folderId, accent = 'violet', addToDock = false, customIcon }) => {
+      addShortcut: ({ title, url, spaceId, folderId, accent = 'violet', addToDock = false, customIcon, ogImage }) => {
         const spacesEnabled = get().settings?.spacesEnabled ?? false;
         const targetSpaceId = spaceId ?? (spacesEnabled ? (get().spaces[get().activeSpaceIndex]?.id ?? 'space-home') : 'space-home');
         const targetFolderId = folderId !== undefined ? folderId : get().openFolderId;
@@ -431,6 +439,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           folderId: targetFolderId,
           accent,
           ...(customIcon != null ? { customIcon } : {}),
+          ...(ogImage != null ? { ogImage } : {}),
         };
         set((state) => {
           let updatedItems = [...state.items, newItem];
@@ -627,9 +636,18 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
       updateItem: (id, updates) => {
         set((state) => ({
-          items: state.items.map((item) =>
-            item.id === id ? ({ ...item, ...updates } as LaunchpadItem) : item,
-          ),
+          items: state.items.map((item) => {
+            if (item.id !== id) return item;
+            const nextUpdates = { ...updates };
+            // Never reset an existing valid ogImage with null or undefined
+            if (item.type === 'shortcut' && item.ogImage && 'ogImage' in nextUpdates) {
+              const targetUpdates = nextUpdates as { ogImage?: string | null };
+              if (targetUpdates.ogImage === null || targetUpdates.ogImage === undefined) {
+                delete targetUpdates.ogImage;
+              }
+            }
+            return { ...item, ...nextUpdates } as LaunchpadItem;
+          }),
         }));
       },
 
@@ -988,8 +1006,8 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       },
 
       folderOrigin: null,
-      openFolder: (id, origin) => set({ openFolderId: id, folderOrigin: origin ?? null }),
-      closeFolder: () => set({ openFolderId: null }),
+      openFolder: (id, origin) => set({ openFolderId: id, folderOrigin: origin ?? null, folderPageIndex: 0 }),
+      closeFolder: () => set({ openFolderId: null, folderPageIndex: 0 }),
 
       reorderDock: (nextOrder) => set({ dockIds: nextOrder }),
 
@@ -1022,6 +1040,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           settings: DEFAULT_SETTINGS,
           activeSpaceIndex: 0,
           activePageIndex: 0,
+          folderPageIndex: 0,
           openFolderId: null,
           activeShortcutMenuId: null,
           hoveredShortcutId: null,
@@ -1047,6 +1066,17 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         settings: state.settings,
       }),
       onRehydrateStorage: () => (state) => {
+        if (state?.wallpaper) {
+          if (state.wallpaper.blur === undefined) {
+            state.wallpaper.blur = DEFAULT_WALLPAPER_CONFIG.blur;
+          }
+          if (state.wallpaper.darkness === undefined) {
+            state.wallpaper.darkness = DEFAULT_WALLPAPER_CONFIG.darkness;
+          }
+          if (state.wallpaper.type === 'preset' && state.wallpaper.presetId !== 'sonoma') {
+            state.wallpaper.presetId = 'sonoma';
+          }
+        }
         if (state?.settings?.spacesEnabled && state.settings.defaultSpaceId && state.spaces) {
           const defaultIndex = state.spaces.findIndex((s) => s.id === state.settings.defaultSpaceId);
           if (defaultIndex !== -1) {
@@ -1125,3 +1155,35 @@ export function selectAllShortcuts(items: LaunchpadItem[]) {
     item.type === 'shortcut',
   );
 }
+
+/** Resolved searchable shortcuts and folders for a given space (or all spaces if spaceId is null/undefined). */
+export function selectSearchableItems(
+  items: LaunchpadItem[],
+  spaceId?: string | null,
+): (ShortcutItem | FolderItem)[] {
+  if (!spaceId) {
+    return items.filter(
+      (item): item is ShortcutItem | FolderItem =>
+        item.type === 'shortcut' || item.type === 'folder',
+    );
+  }
+
+  const folderSpaceMap = new Map<string, string>();
+  for (const item of items) {
+    if (item.type === 'folder') {
+      folderSpaceMap.set(item.id, item.spaceId || 'space-home');
+    }
+  }
+
+  return items.filter((item): item is ShortcutItem | FolderItem => {
+    if (item.type !== 'shortcut' && item.type !== 'folder') return false;
+
+    const itemSpaceId = item.spaceId || 'space-home';
+    const effectiveSpaceId = item.folderId
+      ? (folderSpaceMap.get(item.folderId) ?? itemSpaceId)
+      : itemSpaceId;
+
+    return effectiveSpaceId === spaceId;
+  });
+}
+

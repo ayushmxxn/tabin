@@ -1,6 +1,7 @@
 import type { FolderItem, LaunchpadItem, ShortcutItem } from "@/types";
 import { saveNewTabs } from "@/lib/savedTabsStorage";
 import type { SavedTab } from "@/types/savedTabs";
+import { fetchWebsiteMetadataDirect, downloadImageAsDataUrlDirect } from "@/lib/fetchMetadata";
 
 // Tabin signature brand magenta color for badges
 const BRAND_COLOR = "#FA1E76";
@@ -177,53 +178,61 @@ async function showConfirmation(
 
 /**
  * Ensures only ONE Saved Tabs page exists across all windows.
- * Reuses and focuses the existing tab, closing any accidental duplicates.
- * If none exists, creates a new pinned tab.
+/**
+ * Ensures the persistent Saved Tabs page is open and pinned on the far-left
+ * of every normal browser window, even when there are no saved tabs yet.
+ * Reuses and optionally focuses the existing tab, closing any accidental duplicates.
  */
-async function openOrFocusSavedTabsPage(): Promise<void> {
+async function ensureSavedTabsPinnedTab(activate = false): Promise<void> {
   try {
     const savedTabsPageUrl = chrome.runtime.getURL("/saved-tabs.html");
-    const allTabs = await chrome.tabs.query({});
-    const existingSavedTabs = allTabs.filter(
-      (t) => t.id && t.url && t.url.startsWith(savedTabsPageUrl),
-    );
+    const windows = await chrome.windows.getAll({
+      populate: true,
+      windowTypes: ["normal"],
+    });
 
-    const primaryTab = existingSavedTabs[0];
-    if (primaryTab && primaryTab.id) {
-      // Close any accidental duplicate Saved Tabs tabs
-      if (existingSavedTabs.length > 1) {
-        const duplicateIds = existingSavedTabs
-          .slice(1)
-          .map((t) => t.id!)
-          .filter(Boolean);
-        if (duplicateIds.length > 0) {
-          await chrome.tabs.remove(duplicateIds).catch(() => {});
+    for (const win of windows) {
+      if (!win.id) continue;
+      const tabs = win.tabs || [];
+      const matching = tabs.filter(
+        (t) => t.url && t.url.startsWith(savedTabsPageUrl),
+      );
+
+      if (matching.length > 0) {
+        const primary = matching[0];
+        if (primary && primary.id) {
+          if (!primary.pinned || primary.index !== 0) {
+            await chrome.tabs.update(primary.id, { pinned: true }).catch(() => {});
+            await chrome.tabs.move(primary.id, { index: 0 }).catch(() => {});
+          }
+          if (activate) {
+            await chrome.windows.update(win.id, { focused: true }).catch(() => {});
+            await chrome.tabs.update(primary.id, { active: true }).catch(() => {});
+          }
         }
+        if (matching.length > 1) {
+          const dupeIds = matching.slice(1).map((t) => t.id!).filter(Boolean);
+          if (dupeIds.length > 0) {
+            await chrome.tabs.remove(dupeIds).catch(() => {});
+          }
+        }
+      } else {
+        await chrome.tabs.create({
+          windowId: win.id,
+          url: savedTabsPageUrl,
+          pinned: true,
+          active: activate,
+          index: 0,
+        }).catch(() => {});
       }
-
-      // If existing tab is in another window, focus that window first
-      if (primaryTab.windowId) {
-        await chrome.windows
-          .update(primaryTab.windowId, { focused: true })
-          .catch(() => {});
-      }
-
-      // Focus and ensure pinned
-      await chrome.tabs
-        .update(primaryTab.id, { active: true, pinned: true })
-        .catch(() => {});
-    } else {
-      // If no Saved Tabs tab exists anywhere, create one as a pinned tab
-      await chrome.tabs.create({
-        url: savedTabsPageUrl,
-        active: true,
-        pinned: true,
-      });
     }
   } catch (err) {
-    console.error("Failed to open or focus Saved Tabs page:", err);
+    console.error("Failed to ensure Saved Tabs pinned tab:", err);
   }
 }
+
+/** Backward-compatible alias for actions that focus Saved Tabs */
+const openOrFocusSavedTabsPage = () => ensureSavedTabsPinnedTab(true);
 
 export default defineBackground(() => {
   // Enable extension action icon
@@ -310,11 +319,26 @@ export default defineBackground(() => {
     }
   });
 
-  // Setup context menus on startup and install
+  // Setup context menus and ensure pinned Saved Tabs tab on startup and install
   setupContextMenus();
+  ensureSavedTabsPinnedTab(false);
+
   chrome.runtime.onInstalled.addListener(() => {
     setupContextMenus(true);
+    ensureSavedTabsPinnedTab(false);
   });
+
+  chrome.runtime.onStartup?.addListener(() => {
+    ensureSavedTabsPinnedTab(false);
+  });
+
+  if (chrome.windows?.onCreated) {
+    chrome.windows.onCreated.addListener((win) => {
+      if (win.type === "normal") {
+        ensureSavedTabsPinnedTab(false);
+      }
+    });
+  }
 
   // Re-sync context menus only if folders change in storage
   chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -407,6 +431,13 @@ export default defineBackground(() => {
     // Resolve latest favicon (prefer tab's direct favicon, or null for native resolution)
     const favIconUrl = resolveFaviconUrl(targetTab?.favIconUrl);
 
+    // Resolve OG image once when adding shortcut
+    let ogImage: string | null = null;
+    try {
+      const meta = await fetchWebsiteMetadataDirect(url);
+      if (meta.ogImage) ogImage = meta.ogImage;
+    } catch {}
+
     // Create new shortcut item
     const newId = `shortcut-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const newShortcut: ShortcutItem = {
@@ -418,6 +449,7 @@ export default defineBackground(() => {
       folderId: destinationFolderId,
       accent: "violet",
       customIcon: favIconUrl,
+      ...(ogImage ? { ogImage } : {}),
     };
 
     // If added to folder, update folder itemIds
@@ -456,5 +488,21 @@ export default defineBackground(() => {
 
     // Show fast, native, minimal confirmation
     await showConfirmation(targetTab?.id, "success", title, destinationName);
+  });
+
+  // Handle cross-origin metadata fetch and direct image download requests from newtab/extension pages
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "FETCH_WEBSITE_METADATA" && message.url) {
+      fetchWebsiteMetadataDirect(message.url)
+        .then((data) => sendResponse({ success: true, data }))
+        .catch((err) => sendResponse({ success: false, error: err?.message }));
+      return true;
+    }
+    if (message?.type === "DOWNLOAD_IMAGE" && message.url) {
+      downloadImageAsDataUrlDirect(message.url)
+        .then((dataUrl) => sendResponse({ success: true, dataUrl }))
+        .catch((err) => sendResponse({ success: false, error: err?.message }));
+      return true;
+    }
   });
 });

@@ -1,31 +1,31 @@
-import type { PresetWallpaper, WallpaperConfig } from '@/types';
+import type { PresetWallpaper, WallpaperConfig } from "@/types";
 
 export const PRESET_WALLPAPERS: PresetWallpaper[] = [
   {
-    id: 'monterey',
-    name: 'macOS Monterey',
-    url: '/wallpapers/monterey.jpg',
+    id: "sonoma",
+    name: "macOS Sonoma",
+    url: "/wallpapers/sonoma.jpg",
   },
   {
-    id: 'monterey_twilight',
-    name: 'Monterey Twilight',
-    url: '/wallpapers/monterey_twilight.jpg',
+    id: "moonlight",
+    name: "Moonlit Coast",
+    url: "/wallpapers/moonlight.jpg",
   },
   {
-    id: 'sonoma',
-    name: 'macOS Sonoma',
-    url: '/wallpapers/sonoma.jpg',
+    id: "alpine_sunset",
+    name: "Alpine Sunset",
+    url: "/wallpapers/alpine_sunset.jpg",
   },
   {
-    id: 'sequoia',
-    name: 'macOS Sequoia',
-    url: '/wallpapers/sequoia.jpg',
+    id: "lake_cabin",
+    name: "Alpine Lake Cabin",
+    url: "/wallpapers/lake_cabin.jpg",
   },
 ];
 
 export const DEFAULT_WALLPAPER_CONFIG: WallpaperConfig = {
-  type: 'preset',
-  presetId: 'monterey',
-  blur: 0,
+  type: "preset",
+  presetId: "sonoma",
+  blur: 10,
   darkness: 0.15,
 };
