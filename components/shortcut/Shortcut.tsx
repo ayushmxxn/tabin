@@ -363,7 +363,6 @@ export const Shortcut = memo(function Shortcut({
         dragControls={dragControls}
         dragMomentum={false}
         dragElastic={0.05}
-        whileHover={isMenuOpen || isEmbedMode ? undefined : { scale: 1.05 }}
         whileTap={isMenuOpen ? undefined : { scale: isEmbedMode ? 0.97 : 0.96 }}
         whileDrag={{ scale: isEmbedMode ? 1.04 : 1.08, zIndex: 50 }}
         {...dragHandlers}

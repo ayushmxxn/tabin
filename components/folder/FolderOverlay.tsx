@@ -76,7 +76,7 @@ export function FolderOverlay() {
                   child.type === 'shortcut' ? (
                     <button
                       key={child.id}
-                      className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                      className="flex flex-col items-center gap-1.5 transition-transform active:scale-95 cursor-pointer"
                       onClick={() => openShortcutUrl(child.url, openLinks)}
                     >
                       <Tile title={child.title} url={child.url} accent={child.accent} size="md" />
