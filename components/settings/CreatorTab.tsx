@@ -11,6 +11,26 @@ interface SocialLink {
 
 const SOCIAL_LINKS: SocialLink[] = [
   {
+    label: "Portfolio",
+    url: "https://ayushmxxn.com",
+    icon: (cls = "h-3.5 w-3.5") => (
+      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+      </svg>
+    ),
+  },
+  {
+    label: "Twitter",
+    url: "https://x.com/ayushmxxn",
+    icon: (cls = "h-3.5 w-3.5") => (
+      <svg className={cls} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+      </svg>
+    ),
+  },
+  {
     label: "GitHub",
     url: `https://github.com/${GITHUB_USERNAME}`,
     icon: (cls = "h-3.5 w-3.5") => (
@@ -39,17 +59,6 @@ const SOCIAL_LINKS: SocialLink[] = [
         <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
         <rect width="4" height="12" x="2" y="9" />
         <circle cx="4" cy="4" r="2" />
-      </svg>
-    ),
-  },
-  {
-    label: "Portfolio",
-    url: "https://ayushmxxn.com",
-    icon: (cls = "h-3.5 w-3.5") => (
-      <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="2" y1="12" x2="22" y2="12" />
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
       </svg>
     ),
   },
@@ -211,7 +220,7 @@ export function CreatorTab() {
                 <img
                   src={product.icon}
                   alt=""
-                  className="h-4.5 w-4.5 rounded-[4px] object-cover shrink-0 border border-white/10 bg-white/[0.04]"
+                  className="h-4.5 w-4.5 rounded-[4px] object-contain shrink-0"
                 />
                 <span className="text-[12.5px] font-medium text-white/90 group-hover:text-[#FA1E76] transition-colors shrink-0">
                   {product.name}
