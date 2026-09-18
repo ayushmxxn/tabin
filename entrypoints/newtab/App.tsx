@@ -7,6 +7,7 @@ import { SpaceSwitcher } from "@/components/spaces/SpaceSwitcher";
 import { Wallpaper } from "@/components/wallpaper/Wallpaper";
 import { TopLeftNotch } from "@/components/notch/TopLeftNotch";
 import { TopRightNotch } from "@/components/notch/TopRightNotch";
+import { cn } from "@/lib/utils";
 import { syncStoreFromExternal, useLaunchpadStore } from "@/store/useLaunchpadStore";
 import { backfillShortcutsOgImages } from "@/lib/ogBackfill";
 import { lazy, Suspense, useEffect } from "react";
@@ -26,6 +27,9 @@ const AddModal = lazy(() =>
 export default function App() {
   const isSettingsOpen = useLaunchpadStore((state) => state.isSettingsOpen);
   const isAddModalOpen = useLaunchpadStore((state) => state.isAddModalOpen);
+  const activeShortcutMenuId = useLaunchpadStore(
+    (state) => state.activeShortcutMenuId,
+  );
 
   // Backfill OG images for existing shortcuts saved without them
   useEffect(() => {
@@ -52,40 +56,49 @@ export default function App() {
     if (typeof chrome === "undefined" || !chrome.tabs) return;
     const savedTabsUrl = chrome.runtime.getURL("/saved-tabs.html");
 
-    chrome.tabs.query({ currentWindow: true }, (windowTabs) => {
-      if (chrome.runtime?.lastError || !windowTabs) return;
-      const existingInWindow = windowTabs.find(
-        (t) => t.url && t.url.startsWith(savedTabsUrl),
-      );
-
-      if (existingInWindow && existingInWindow.id) {
-        if (!existingInWindow.pinned || existingInWindow.index !== 0) {
-          chrome.tabs.update(existingInWindow.id, { pinned: true }).catch(() => {});
-          chrome.tabs.move(existingInWindow.id, { index: 0 }).catch(() => {});
-        }
-      } else {
-        chrome.tabs.create(
-          {
-            url: savedTabsUrl,
-            pinned: true,
-            active: false,
-            index: 0,
-          },
-          (newTab) => {
-            if (chrome.runtime?.lastError) {
-              console.warn("Failed to pin Saved Tabs:", chrome.runtime.lastError);
-            }
-          },
+    try {
+      chrome.tabs.query({ currentWindow: true }, (windowTabs) => {
+        if (chrome.runtime?.lastError || !windowTabs) return;
+        const existingInWindow = windowTabs.find(
+          (t) => t.url && t.url.startsWith(savedTabsUrl),
         );
-      }
-    });
+
+        if (existingInWindow && existingInWindow.id) {
+          if (!existingInWindow.pinned || existingInWindow.index !== 0) {
+            chrome.tabs.update(existingInWindow.id, { pinned: true }).catch(() => {});
+            chrome.tabs.move(existingInWindow.id, { index: 0 }).catch(() => {});
+          }
+        } else {
+          chrome.tabs.create(
+            {
+              url: savedTabsUrl,
+              pinned: true,
+              active: false,
+              index: 0,
+            },
+            () => {
+              if (chrome.runtime?.lastError) {
+                console.warn("Failed to pin Saved Tabs:", chrome.runtime.lastError);
+              }
+            },
+          );
+        }
+      });
+    } catch (err) {
+      console.warn("Tabs query error in App:", err);
+    }
   }, []);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden font-sans select-none">
       <Wallpaper />
 
-      <main className="pointer-events-none relative z-10 mx-auto h-full w-full max-w-[1360px] px-6 sm:px-12 pt-16 pb-24">
+      <main
+        className={cn(
+          "pointer-events-none relative mx-auto h-full w-full max-w-[1360px] px-6 sm:px-12 pt-16 pb-24",
+          activeShortcutMenuId ? "z-30" : "z-10",
+        )}
+      >
         <Canvas />
       </main>
 

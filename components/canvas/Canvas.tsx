@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Shortcut } from '../shortcut/Shortcut';
 import {
@@ -91,14 +92,16 @@ export function Canvas() {
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!canvasRef.current?.contains(target)) return;
 
       if (
         target.closest('[data-tile-id]') ||
         target.closest('[data-folder-item]') ||
+        target.closest('[data-dock]') ||
         target.closest('button') ||
         target.closest('a') ||
-        target.closest('input')
+        target.closest('input') ||
+        target.closest('[role="dialog"]') ||
+        target.closest('[data-modal]')
       ) {
         return;
       }
@@ -123,10 +126,12 @@ export function Canvas() {
       if (
         target?.closest('[data-tile-id]') ||
         target?.closest('[data-folder-item]') ||
+        target?.closest('[data-dock]') ||
         target?.closest('button') ||
         target?.closest('a') ||
         target?.closest('input') ||
-        target?.closest('[role="dialog"]')
+        target?.closest('[role="dialog"]') ||
+        target?.closest('[data-modal]')
       ) {
         return;
       }
@@ -479,46 +484,48 @@ export function Canvas() {
 
       {/* Canvas right-click context menu */}
       <AnimatePresence>
-        {ctxMenu && (
-          <motion.div
-            ref={ctxMenuRef}
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.94 }}
-            transition={{ duration: 0.1, ease: 'easeOut' }}
-            style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
-            className="w-46 overflow-hidden rounded-xl border border-white/15 bg-[#141414]/96 p-1 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.75)] backdrop-blur-2xl select-none"
-            onClick={(e) => e.stopPropagation()}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setCtxMenu(null);
-                setAddModalOpen(true);
-              }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[12px] text-white/90 text-left cursor-pointer hover:bg-white/10 transition-colors"
+        {ctxMenu && typeof document !== 'undefined' &&
+          createPortal(
+            <motion.div
+              ref={ctxMenuRef}
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              transition={{ duration: 0.1, ease: 'easeOut' }}
+              style={{ position: 'fixed', top: ctxMenu.y, left: ctxMenu.x, zIndex: 9999 }}
+              className="w-46 overflow-hidden rounded-xl border border-white/15 bg-[#141414]/96 p-1 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.75)] backdrop-blur-2xl select-none"
+              onClick={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.preventDefault()}
             >
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-white/60 shrink-0"
-                aria-hidden
+              <button
+                type="button"
+                onClick={() => {
+                  setCtxMenu(null);
+                  setAddModalOpen(true);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[12px] text-white/90 text-left cursor-pointer hover:bg-white/10 transition-colors"
               >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="16" />
-                <line x1="8" y1="12" x2="16" y2="12" />
-              </svg>
-              <span>Create new shortcut</span>
-            </button>
-          </motion.div>
-        )}
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-white/60 shrink-0"
+                  aria-hidden
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="16" />
+                  <line x1="8" y1="12" x2="16" y2="12" />
+                </svg>
+                <span>Create new shortcut</span>
+              </button>
+            </motion.div>,
+            document.body,
+          )}
       </AnimatePresence>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo, type RefObject } from 'react';
 import { AnimatePresence, motion, useDragControls } from 'motion/react';
-import { Tile } from './Tile';
+import { Tile, clearFailedFaviconUrl } from './Tile';
 import { ShortcutEmbedTile, clearFailedImageUrl } from './ShortcutEmbedTile';
 import { useCanvasDrag } from '@/hooks/useCanvasDrag';
 import { useLaunchpadStore } from '@/store/useLaunchpadStore';
@@ -129,6 +129,7 @@ export const Shortcut = memo(function Shortcut({
     reader.onload = () => {
       const dataUrl = reader.result as string;
       if (dataUrl) {
+        if (item.customIcon) clearFailedFaviconUrl(item.customIcon);
         updateItem(item.id, { customIcon: dataUrl });
       }
       setActiveShortcutMenuId(null);
@@ -156,6 +157,7 @@ export const Shortcut = memo(function Shortcut({
   const [isRefreshingPreview, setIsRefreshingPreview] = useState(false);
 
   const handleResetFavicon = () => {
+    if (item.customIcon) clearFailedFaviconUrl(item.customIcon);
     updateItem(item.id, { customIcon: null });
     setActiveShortcutMenuId(null);
   };

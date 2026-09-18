@@ -20,6 +20,17 @@ const SIZE_CLASSES: Record<NonNullable<TileProps["size"]>, string> = {
   xs: "h-4 w-4",
 };
 
+// Module-level cache to track failed favicon URLs and prevent infinite retry/re-render loops
+const failedFaviconUrls = new Set<string>();
+
+export function clearFailedFaviconUrl(url?: string | null) {
+  if (url) {
+    failedFaviconUrls.delete(url);
+  } else {
+    failedFaviconUrls.clear();
+  }
+}
+
 export const Tile = memo(function Tile({
   title,
   url,
@@ -29,13 +40,16 @@ export const Tile = memo(function Tile({
   className,
   children,
 }: TileProps) {
-  const [faviconFailed, setFaviconFailed] = useState(false);
-  const favicon = customIcon || (url ? getFaviconUrl(url) : null);
-  const showFavicon = favicon && !faviconFailed;
+  const defaultFavicon = url ? getFaviconUrl(url) : null;
+  const customFailed = Boolean(customIcon && failedFaviconUrls.has(customIcon));
+  const activeIconUrl = (!customFailed && customIcon) ? customIcon : defaultFavicon;
+  const isFailed = Boolean(activeIconUrl && failedFaviconUrls.has(activeIconUrl));
+
+  const [hasError, setHasError] = useState(() => isFailed);
 
   useEffect(() => {
-    setFaviconFailed(false);
-  }, [customIcon, url]);
+    setHasError(isFailed);
+  }, [isFailed, activeIconUrl]);
 
   if (children) {
     return (
@@ -53,10 +67,12 @@ export const Tile = memo(function Tile({
     );
   }
 
+  const showFavicon = Boolean(activeIconUrl && !hasError);
+
   if (showFavicon) {
     return (
       <img
-        src={favicon}
+        src={activeIconUrl!}
         alt=""
         draggable={false}
         loading="lazy"
@@ -68,12 +84,18 @@ export const Tile = memo(function Tile({
           SIZE_CLASSES[size],
           className,
         )}
-        onError={() => setFaviconFailed(true)}
+        onError={() => {
+          if (activeIconUrl) {
+            failedFaviconUrls.add(activeIconUrl);
+          }
+          setHasError(true);
+        }}
       />
     );
   }
 
-  const { tile } = ACCENT_CLASSES[accent];
+  const accentConfig = (accent && ACCENT_CLASSES[accent]) ? ACCENT_CLASSES[accent] : ACCENT_CLASSES.violet;
+  const tile = accentConfig.tile;
 
   return (
     <div

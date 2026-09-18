@@ -257,13 +257,35 @@ const dualStorageAdapter = {
   },
 };
 
+function getSynchronousPersistedState(): {
+  spaces?: typeof SPACES;
+  items?: typeof INITIAL_ITEMS;
+  dockIds?: string[];
+  wallpaper?: typeof DEFAULT_WALLPAPER_CONFIG;
+  settings?: typeof DEFAULT_SETTINGS;
+} | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('launchpad-storage');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const state = parsed?.state;
+    if (state && typeof state === 'object' && Array.isArray(state.items)) {
+      return state;
+    }
+  } catch {}
+  return null;
+}
+
+const syncSeed = getSynchronousPersistedState();
+
 export const useLaunchpadStore = create<LaunchpadState>()(
   persist(
     (set, get) => ({
-      spaces: SPACES,
+      spaces: syncSeed?.spaces && Array.isArray(syncSeed.spaces) ? syncSeed.spaces : SPACES,
       activeSpaceIndex: 0,
-      items: INITIAL_ITEMS,
-      dockIds: INITIAL_DOCK_IDS,
+      items: syncSeed?.items && Array.isArray(syncSeed.items) ? syncSeed.items : INITIAL_ITEMS,
+      dockIds: syncSeed?.dockIds && Array.isArray(syncSeed.dockIds) ? syncSeed.dockIds : INITIAL_DOCK_IDS,
       openFolderId: null,
       activeShortcutMenuId: null,
       setActiveShortcutMenuId: (id) => set({ activeShortcutMenuId: id }),
@@ -277,8 +299,8 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       lastRestoredTitle: null,
       isUndoToastVisible: false,
 
-      wallpaper: DEFAULT_WALLPAPER_CONFIG,
-      settings: DEFAULT_SETTINGS,
+      wallpaper: syncSeed?.wallpaper ? { ...DEFAULT_WALLPAPER_CONFIG, ...syncSeed.wallpaper } : DEFAULT_WALLPAPER_CONFIG,
+      settings: syncSeed?.settings ? { ...DEFAULT_SETTINGS, ...syncSeed.settings } : DEFAULT_SETTINGS,
       isSettingsOpen: false,
       isAddModalOpen: false,
 

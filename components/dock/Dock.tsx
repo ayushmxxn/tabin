@@ -387,7 +387,10 @@ export function Dock() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3.5 z-20 flex justify-center">
-      <div className="pointer-events-auto flex items-center gap-3.5 rounded-[20px] border border-white/10 bg-[#141414]/94 p-1.5 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+      <div
+        data-dock="true"
+        className="pointer-events-auto flex items-center gap-3.5 rounded-[20px] border border-white/10 bg-[#141414]/94 p-1.5 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl"
+      >
         {/* Home Destination Button */}
         <div
           className="relative flex flex-col items-center"

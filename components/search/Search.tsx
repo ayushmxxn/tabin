@@ -2,7 +2,7 @@ import { getHostname, openShortcutUrl } from "@/lib/utils";
 import { useLaunchpadStore, selectFolderChildren, selectSearchableItems } from "@/store/useLaunchpadStore";
 import { useColumns, PAGE_ROWS } from "@/lib/layout";
 import type { FolderItem, LaunchpadItem, ShortcutItem } from "@/types";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, PresenceContext } from "motion/react";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Tile } from "../shortcut/Tile";
 import { Folder } from "../folder/Folder";
@@ -99,10 +99,13 @@ export function Search() {
   }, [isSearchOpen, searchQuery, activeSpace.id]);
 
 
-  // Auto-scroll selected item into view when navigating with arrow keys
+  const isKeyboardNavRef = useRef(false);
+
+  // Auto-scroll selected item into view only when navigating with arrow keys/tab
   useEffect(() => {
-    if (isSearchOpen && selectedItemRef.current) {
+    if (isSearchOpen && isKeyboardNavRef.current && selectedItemRef.current) {
       selectedItemRef.current.scrollIntoView({ block: "nearest" });
+      isKeyboardNavRef.current = false;
     }
   }, [selectedIndex, isSearchOpen]);
 
@@ -253,11 +256,13 @@ export function Search() {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       if (results.length > 0) {
+        isKeyboardNavRef.current = true;
         setSelectedIndex((prev) => (prev + 1) % results.length);
       }
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       if (results.length > 0) {
+        isKeyboardNavRef.current = true;
         setSelectedIndex(
           (prev) => (prev - 1 + results.length) % results.length,
         );
@@ -265,6 +270,7 @@ export function Search() {
     } else if (event.key === "Tab") {
       event.preventDefault();
       if (results.length > 0) {
+        isKeyboardNavRef.current = true;
         setSelectedIndex((prev) =>
           event.shiftKey
             ? (prev - 1 + results.length) % results.length
@@ -414,76 +420,84 @@ export function Search() {
                 </p>
               </div>
             ) : (
-              <ul className="space-y-0.5">
-                {results.map((item, idx) => {
-                  const isSelected = idx === selectedIndex;
-                  return (
-                    <li
-                      key={item.id}
-                      ref={isSelected ? selectedItemRef : null}
-                      className="relative"
-                    >
-                      {isSelected && (
-                        <motion.div
-                          layoutId="search-highlight"
-                          className="absolute inset-0 rounded-xl bg-white/[0.12] ring-1 ring-white/[0.18] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16)]"
-                          transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                        />
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleItemSelect(item)}
-                        onMouseEnter={() => setSelectedIndex(idx)}
-                        className={`relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left cursor-pointer ${
-                          isSelected ? "text-white" : "text-white/80"
-                        }`}
+              <PresenceContext.Provider value={null}>
+                <ul className="space-y-0.5">
+                  {results.map((item, idx) => {
+                    const isSelected = idx === selectedIndex;
+                    return (
+                      <li
+                        key={item.id}
+                        ref={isSelected ? selectedItemRef : null}
+                        className="relative"
                       >
-                        {item.type === "folder" ? (
-                          <div className="relative flex h-7 w-7 shrink-0 items-center justify-center pointer-events-none select-none">
-                            <div
-                              className="relative flex items-center justify-center pointer-events-none transition-transform duration-200 ease-out"
-                              style={{
-                                width: 208.65,
-                                height: 175.5,
-                                transform: "scale(0.145)",
-                                transformOrigin: "center center",
-                              }}
-                            >
-                              <Folder
-                                color={item.color || DEFAULT_FOLDER_COLOR}
-                                size="sm"
-                                items={selectFolderChildren(items, item).filter(
-                                  (i): i is ShortcutItem => i.type === "shortcut",
-                                )}
-                                isHovered={isSelected}
-                              />
-                            </div>
-                          </div>
-                        ) : (
-                          <Tile
-                            title={item.title}
-                            url={item.url}
-                            customIcon={item.customIcon}
-                            accent={item.accent}
-                            size="sm"
-                          />
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleItemSelect(item)}
+                          onMouseEnter={() => {
+                            isKeyboardNavRef.current = false;
+                            setSelectedIndex(idx);
+                          }}
+                          className={`relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left cursor-pointer ${
+                            isSelected ? "text-white" : "text-white/80"
+                          }`}
+                        >
+                          {isSelected && (
+                            <motion.div
+                              layoutId="search-highlight"
+                              className="absolute inset-0 rounded-xl bg-white/[0.12] ring-1 ring-white/[0.18] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16)] pointer-events-none"
+                              transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                            />
+                          )}
 
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate text-[12px] font-medium text-white/95 leading-snug">
-                            {item.title}
+                        <div className="relative z-10 flex w-full items-center gap-2.5 min-w-0 pointer-events-none">
+                          {item.type === "folder" ? (
+                            <div className="relative flex h-7 w-7 shrink-0 items-center justify-center select-none">
+                              <div
+                                className="relative flex items-center justify-center transition-transform duration-200 ease-out"
+                                style={{
+                                  width: 208.65,
+                                  height: 175.5,
+                                  transform: "scale(0.145)",
+                                  transformOrigin: "center center",
+                                }}
+                              >
+                                <Folder
+                                  color={item.color || DEFAULT_FOLDER_COLOR}
+                                  size="sm"
+                                  items={selectFolderChildren(items, item).filter(
+                                    (i): i is ShortcutItem => i.type === "shortcut",
+                                  )}
+                                  isHovered={isSelected}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <Tile
+                              title={item.title}
+                              url={item.url}
+                              customIcon={item.customIcon}
+                              accent={item.accent}
+                              size="sm"
+                            />
+                          )}
+
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="truncate text-[12px] font-medium text-white/95 leading-snug">
+                              {item.title}
+                            </span>
+                            <span className="truncate text-[10.5px] text-white/40 leading-snug">
+                              {item.type === "folder"
+                                ? `Folder · ${item.itemIds.length} ${item.itemIds.length === 1 ? 'shortcut' : 'shortcuts'}`
+                                : getHostname(item.url)}
+                            </span>
                           </span>
-                          <span className="truncate text-[10.5px] text-white/40 leading-snug">
-                            {item.type === "folder"
-                              ? `Folder · ${item.itemIds.length} ${item.itemIds.length === 1 ? 'shortcut' : 'shortcuts'}`
-                              : getHostname(item.url)}
-                          </span>
-                        </span>
+                        </div>
                       </button>
                     </li>
                   );
                 })}
-              </ul>
+                </ul>
+              </PresenceContext.Provider>
             )}
           </motion.div>
         )}

@@ -114,7 +114,7 @@ export function Wallpaper() {
             src={staticImageSrc}
             alt=""
             fetchPriority="high"
-            decoding="async"
+            decoding="sync"
             aria-hidden="true"
             className="h-full w-full object-cover"
           />

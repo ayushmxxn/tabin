@@ -25,16 +25,60 @@ const KNOWN_DOMAINS: Record<string, string> = {
   amazon: "Amazon",
   linkedin: "LinkedIn",
   instagram: "Instagram",
+  whatsapp: "WhatsApp",
+  raycast: "Raycast",
+  flipkart: "Flipkart",
+  myntra: "Myntra",
+  zomato: "Zomato",
+  primevideo: "Prime Video",
+  disneyplus: "Disney+",
+  "serenity-ui": "Serenity UI",
+  obsidian: "Obsidian",
+  chatgpt: "ChatGPT",
+  claude: "Claude",
+  gemini: "Gemini",
+  openclaw: "OpenClaw",
+  "hermes-agent": "Hermes Agent",
+  granola: "Granola",
+  midjourney: "Midjourney",
+  spline: "Spline",
+  rive: "Rive",
+  wisprflow: "Wispr Flow",
+  framer: "Framer",
+  webflow: "Webflow",
+  beehiiv: "Beehiiv",
+  cal: "Cal.com",
+  cap: "Cap",
+  runable: "Runable",
+  viktor: "Viktor",
+  elevenlabs: "ElevenLabs",
+  cursor: "Cursor",
+  manus: "Manus",
+  recraft: "Recraft",
 };
 
 function cleanTitleFromUrl(rawUrl: string): string {
   try {
     const formatted = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
     const parsed = new URL(formatted);
-    const host = parsed.hostname.replace(/^www\./, "");
+    const host = parsed.hostname.replace(/^(www|web|open|app)\./, "");
     const parts = host.split(".");
     const name = parts[0]?.toLowerCase() || "Website";
     if (KNOWN_DOMAINS[name]) return KNOWN_DOMAINS[name];
+    if (host.includes("ayushmxxn.com")) return "ayushmxxn.com";
+    if (host.includes("serenity-ui.com")) return "Serenity UI";
+    if (host.includes("hermes-agent")) return "Hermes Agent";
+    if (host.includes("openclaw")) return "OpenClaw";
+    if (host.includes("wisprflow")) return "Wispr Flow";
+    if (host.includes("beehiiv")) return "Beehiiv";
+    if (host.includes("cal.com")) return "Cal.com";
+    if (host.includes("cap.so")) return "Cap";
+    if (host.includes("runable")) return "Runable";
+    if (host.includes("viktor")) return "Viktor";
+    if (host.includes("superlist") || host.includes("superli.st")) return "Superlist";
+    if (host.includes("stacklist")) return "Stacklist";
+    if (host.includes("mira.tg")) return "Mira";
+    if (host.includes("kolo")) return "Kolo";
     return name.charAt(0).toUpperCase() + name.slice(1);
   } catch {
     return "";
@@ -142,15 +186,8 @@ export function AddModal() {
 
     fetchWebsiteMetadata(finalUrl)
       .then((meta) => {
-        const updates: Record<string, unknown> = {};
         if (meta.ogImage) {
-          updates.ogImage = meta.ogImage;
-        }
-        if (meta.favicon) {
-          updates.customIcon = meta.favicon;
-        }
-        if (Object.keys(updates).length > 0) {
-          updateItem(id, updates);
+          updateItem(id, { ogImage: meta.ogImage });
         }
       })
       .catch(() => {});

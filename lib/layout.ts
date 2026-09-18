@@ -150,8 +150,8 @@ export function useCanvasGrid(
     const el = containerRef.current;
     const update = () => {
       const rect = el ? el.getBoundingClientRect() : null;
-      const width = rect?.width || window.innerWidth;
-      const height = rect?.height || window.innerHeight;
+      const width = (rect && rect.width > 0 ? rect.width : window.innerWidth) || 1440;
+      const height = (rect && rect.height > 0 ? rect.height : window.innerHeight) || 800;
       setGrid({
         columns: getColumnsForWidth(width, mode, isEmbedMode),
         containerWidth: width,
@@ -161,25 +161,36 @@ export function useCanvasGrid(
 
     update();
 
-    if (!el) {
-      window.addEventListener('resize', update);
-      return () => window.removeEventListener('resize', update);
+    window.addEventListener('resize', update);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        update();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    let observer: ResizeObserver | null = null;
+    if (el) {
+      observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.contentRect.width > 0) {
+            setGrid({
+              columns: getColumnsForWidth(entry.contentRect.width, mode, isEmbedMode),
+              containerWidth: entry.contentRect.width,
+              containerHeight: entry.contentRect.height > 0 ? entry.contentRect.height : window.innerHeight,
+            });
+          }
+        }
+      });
+      observer.observe(el);
     }
 
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
-          setGrid({
-            columns: getColumnsForWidth(entry.contentRect.width, mode, isEmbedMode),
-            containerWidth: entry.contentRect.width,
-            containerHeight: entry.contentRect.height,
-          });
-        }
-      }
-    });
-
-    observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      window.removeEventListener('resize', update);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (observer) observer.disconnect();
+    };
   }, [containerRef, mode, isEmbedMode]);
 
   return grid;

@@ -162,11 +162,20 @@ export function useCanvasDrag({ id, canvasRef, columns, pageOffset, onMove, onRe
       // Smoothly spring offset back to 0
       animate(x, 0, { type: 'spring', stiffness: 350, damping: 28 });
       animate(y, 0, { type: 'spring', stiffness: 350, damping: 28 });
+
+      // Clear drag distance shortly after drag finishes so future clicks are never blocked
+      setTimeout(() => {
+        dragDistance.current = 0;
+      }, 60);
     },
   };
 
   const handleActivate = () => {
-    if (dragDistance.current >= DRAG_THRESHOLD) return;
+    if (dragDistance.current >= DRAG_THRESHOLD) {
+      dragDistance.current = 0;
+      return;
+    }
+    dragDistance.current = 0;
     onActivate();
   };
 

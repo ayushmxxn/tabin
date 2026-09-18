@@ -32,7 +32,13 @@ export function openShortcutUrl(url: string, mode: OpenLinksMode = "newTab") {
       window.location.href = targetUrl;
     }
   } else {
-    window.open(targetUrl, "_blank", "noopener,noreferrer");
+    if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+      chrome.tabs.create({ url: targetUrl, active: true }).catch(() => {
+        window.open(targetUrl, "_blank", "noopener,noreferrer");
+      });
+    } else {
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+    }
   }
 }
 
@@ -45,6 +51,62 @@ export function openShortcutUrl(url: string, mode: OpenLinksMode = "newTab") {
 export function getFaviconUrl(url: string, size = 128): string | null {
   try {
     const { hostname } = new URL(url);
+    if (hostname === 'cal.com' || hostname.endsWith('.cal.com')) {
+      return '/cal.png';
+    }
+    if (hostname === 'cap.so' || hostname.endsWith('.cap.so')) {
+      return '/cap.png';
+    }
+    if (
+      hostname === 'runable.link' ||
+      hostname.endsWith('.runable.link') ||
+      hostname === 'runable.com' ||
+      hostname.endsWith('.runable.com')
+    ) {
+      return '/runable.png';
+    }
+    if (
+      hostname === 'viktor.com' ||
+      hostname.endsWith('.viktor.com')
+    ) {
+      return '/viktor.png';
+    }
+    if (
+      hostname === 'wisprflow.ai' ||
+      hostname.endsWith('.wisprflow.ai')
+    ) {
+      return '/wisprflow.png';
+    }
+    if (
+      hostname === 'superli.st' ||
+      hostname.endsWith('.superli.st') ||
+      hostname === 'superlist.com' ||
+      hostname.endsWith('.superlist.com')
+    ) {
+      return '/superlist.png';
+    }
+    if (
+      hostname === 'stacklist.link' ||
+      hostname.endsWith('.stacklist.link') ||
+      hostname === 'stacklist.com' ||
+      hostname.endsWith('.stacklist.com')
+    ) {
+      return '/stacklist.png';
+    }
+    if (
+      hostname === 'mira.tg' ||
+      hostname.endsWith('.mira.tg')
+    ) {
+      return '/mira.png';
+    }
+    if (
+      hostname === 'kolo.dub.link' ||
+      hostname.endsWith('.kolo.dub.link') ||
+      hostname === 'kolo.ai' ||
+      hostname.endsWith('.kolo.ai')
+    ) {
+      return '/kolo.png';
+    }
     return `https://www.google.com/s2/favicons?domain=${hostname}&sz=${size}`;
   } catch {
     return null;
