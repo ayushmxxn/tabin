@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 
 const GITHUB_USERNAME = "ayushmxxn";
 const GITHUB_AVATAR_URL = `https://github.com/${GITHUB_USERNAME}.png`;
+const KIT_FORM_ID = "e936260cec";
+const KIT_FORM_URL = `https://ayushmaan-singh.kit.com/${KIT_FORM_ID}`;
 
 interface SocialLink {
   label: string;
@@ -123,26 +125,6 @@ export function CreatorTab() {
   const [avatarLoaded, setAvatarLoaded] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
 
-  // Kit Newsletter subscription state
-  const [email, setEmail] = useState("");
-  const [isSubscribing, setIsSubscribing] = useState(false);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-
-  const handleSubscribe = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || isSubscribing) return;
-
-    setIsSubscribing(true);
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setIsSubscribed(true);
-    } catch {
-      // Graceful fallback
-    } finally {
-      setIsSubscribing(false);
-    }
-  };
-
   return (
     <div className="min-h-full flex-1 flex flex-col justify-center gap-7 py-1">
       {/* 1. Profile & Socials */}
@@ -260,32 +242,23 @@ export function CreatorTab() {
           </p>
         </div>
 
-        {isSubscribed ? (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-[11.5px] font-medium text-emerald-400">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span>Thanks for subscribing! Check your inbox to confirm.</span>
-          </div>
-        ) : (
-          <form onSubmit={handleSubscribe} className="flex items-center gap-2">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              required
-              className="flex-1 h-[38px] rounded-[10px] border border-white/10 bg-white/[0.03] px-3.5 text-[12.5px] text-white placeholder-white/35 focus:border-[#FA1E76]/60 focus:bg-white/[0.05] focus:outline-none transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={isSubscribing || !email.trim()}
-              className="h-[38px] rounded-[10px] bg-[#FA1E76] hover:bg-[#ff3086] active:bg-[#e01666] disabled:opacity-35 disabled:cursor-not-allowed px-4 text-[12px] font-medium text-white shadow-[0_2px_8px_rgba(250,30,118,0.3)] transition-all cursor-pointer shrink-0"
-            >
-              {isSubscribing ? "Subscribing…" : "Subscribe"}
-            </button>
-          </form>
-        )}
+        <div>
+          <a
+            href={KIT_FORM_URL}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => {
+              if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+                e.preventDefault();
+                chrome.tabs.create({ url: KIT_FORM_URL });
+              }
+            }}
+            data-formkit-toggle={KIT_FORM_ID}
+            className="h-[34px] rounded-[10px] bg-[#FA1E76] hover:bg-[#ff3086] active:bg-[#e01666] px-4 text-[12px] font-medium text-white shadow-[0_2px_8px_rgba(250,30,118,0.3)] transition-all cursor-pointer inline-flex items-center justify-center"
+          >
+            Subscribe
+          </a>
+        </div>
       </div>
     </div>
   );

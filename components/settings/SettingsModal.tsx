@@ -430,7 +430,7 @@ export function SettingsModal() {
                     className={`h-[20px] w-[20px] rounded-[5.5px] object-cover shrink-0 transition-all ${
                       activeTab === "creator"
                         ? "ring-1.5 ring-[#FA1E76] shadow-[0_0_8px_rgba(250,30,118,0.4)]"
-                        : "opacity-70 ring-1 ring-white/15"
+                        : "ring-1 ring-white/15"
                     }`}
                   />
                 </span>
