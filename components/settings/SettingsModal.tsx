@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ImportExportTab } from "./ImportExportTab";
 import { PrivacyTab } from "./PrivacyTab";
 import { AboutTab } from "./AboutTab";
+import { CreatorTab } from "./CreatorTab";
 import { SpacesTab } from "./SpacesTab";
 import { saveLiveWallpaperBlob } from "@/lib/videoStorage";
 
@@ -17,7 +18,8 @@ type SettingsTabId =
   | "spaces"
   | "backup"
   | "privacy"
-  | "about";
+  | "about"
+  | "creator";
 
 interface TabItem {
   id: SettingsTabId;
@@ -398,8 +400,46 @@ export function SettingsModal() {
               })}
             </div>
 
-            {/* Reset to Defaults Action */}
-            <div className="mt-auto px-1 pt-2.5 border-t border-white/[0.06]">
+            {/* Bottom Actions: Creator Tab + Reset to Defaults */}
+            <div className="mt-auto flex flex-col gap-1">
+              {/* Creator Tab */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("creator")}
+                className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] transition-colors cursor-pointer ${
+                  activeTab === "creator"
+                    ? "text-white font-medium"
+                    : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                {activeTab === "creator" && (
+                  <motion.div
+                    layoutId="settings-active-tab-pill"
+                    className="absolute inset-0 rounded-lg bg-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                    transition={{
+                      type: "spring",
+                      stiffness: 450,
+                      damping: 35,
+                    }}
+                  />
+                )}
+                <span className="relative z-10 shrink-0">
+                  <img
+                    src="https://github.com/ayushmxxn.png"
+                    alt="Ayushmaan Singh"
+                    className={`h-[20px] w-[20px] rounded-[5.5px] object-cover shrink-0 transition-all ${
+                      activeTab === "creator"
+                        ? "ring-1.5 ring-[#FA1E76] shadow-[0_0_8px_rgba(250,30,118,0.4)]"
+                        : "opacity-70 ring-1 ring-white/15"
+                    }`}
+                  />
+                </span>
+                <span className="relative z-10 truncate">Creator</span>
+              </button>
+
+              <div className="my-1 h-px bg-white/[0.06]" />
+
+              {/* Reset to Defaults Action */}
               <button
                 type="button"
                 onClick={() => setIsResetConfirmOpen(true)}
@@ -884,6 +924,9 @@ export function SettingsModal() {
 
             {/* About Tab */}
             {activeTab === "about" && <AboutTab />}
+
+            {/* Creator Tab */}
+            {activeTab === "creator" && <CreatorTab />}
           </div>
 
           {/* Delete Item Warning Dialog */}

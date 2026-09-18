@@ -1,8 +1,6 @@
-import { motion } from "motion/react";
-
 const GITHUB_REPO_URL = "https://github.com/ayushmxxn/tabin";
-const GITHUB_ISSUES_URL = "https://github.com/ayushmxxn/tabin/issues";
 const GITHUB_NEW_ISSUE_URL = "https://github.com/ayushmxxn/tabin/issues/new";
+const DISCORD_URL = "https://discord.com/invite/kzk6uWey3g";
 
 export function AboutTab() {
   const version =
@@ -26,9 +24,6 @@ export function AboutTab() {
             </h3>
             <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-white/[0.07] text-white/60 border border-white/[0.08] leading-none">
               v{version}
-            </span>
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-[#FA1E76]/15 text-[#FA1E76] border border-[#FA1E76]/25 leading-none">
-              MIT License
             </span>
           </div>
           <p className="text-[12px] text-white/50 mt-1 leading-relaxed">
@@ -64,7 +59,7 @@ export function AboutTab() {
             </svg>
           </div>
           <span className="text-[10.5px] text-white/40 mt-1">
-            Browse source code and releases
+            Browse source code, releases, and star Tabin
           </span>
         </a>
 
@@ -98,7 +93,7 @@ export function AboutTab() {
         </a>
 
         <a
-          href={GITHUB_ISSUES_URL}
+          href={DISCORD_URL}
           target="_blank"
           rel="noreferrer"
           className="group flex flex-col rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 hover:border-white/[0.12] hover:bg-white/[0.05] transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
@@ -120,7 +115,7 @@ export function AboutTab() {
             </svg>
           </div>
           <span className="text-[10.5px] text-white/40 mt-1">
-            Join discussions and share ideas
+            Join the Tabin community and share feedback
           </span>
         </a>
       </div>
@@ -135,23 +130,6 @@ export function AboutTab() {
         <div className="flex items-center justify-between text-[11.5px]">
           <span className="text-white/45">License</span>
           <span className="text-white/80 font-medium">MIT License</span>
-        </div>
-        <div className="h-px bg-white/[0.04]" />
-        <div className="flex items-center justify-between text-[11.5px]">
-          <span className="text-white/45">Built with</span>
-          <span className="text-white/80 font-medium">React, Tailwind CSS, Motion & WXT</span>
-        </div>
-        <div className="h-px bg-white/[0.04]" />
-        <div className="flex items-center justify-between text-[11.5px]">
-          <span className="text-white/45">Author</span>
-          <a
-            href="https://github.com/ayushmxxn"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[#FA1E76] hover:text-[#FA1E76]/80 transition-colors font-medium"
-          >
-            Ayushmaan Singh (@ayushmxxn)
-          </a>
         </div>
       </div>
     </div>
