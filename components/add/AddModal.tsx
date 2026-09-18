@@ -55,6 +55,7 @@ const KNOWN_DOMAINS: Record<string, string> = {
   cursor: "Cursor",
   manus: "Manus",
   recraft: "Recraft",
+  typesafe: "TypeSafe AI",
 };
 
 function cleanTitleFromUrl(rawUrl: string): string {

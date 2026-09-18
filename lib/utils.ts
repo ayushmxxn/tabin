@@ -107,6 +107,12 @@ export function getFaviconUrl(url: string, size = 128): string | null {
     ) {
       return '/kolo.png';
     }
+    if (
+      hostname === 'typesafe.ai' ||
+      hostname.endsWith('.typesafe.ai')
+    ) {
+      return '/typesafe.png';
+    }
     return `https://www.google.com/s2/favicons?domain=${hostname}&sz=${size}`;
   } catch {
     return null;

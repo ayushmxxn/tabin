@@ -257,9 +257,42 @@ const dualStorageAdapter = {
   },
 };
 
+function migrateLegacyItems(items: LaunchpadItem[]): LaunchpadItem[] {
+  return items.map((item) => {
+    if (item.type === 'folder' && Array.isArray(item.itemIds)) {
+      return {
+        ...item,
+        itemIds: item.itemIds.map((id) => (id === 'twitch' ? 'typesafe' : id)),
+      };
+    }
+    if (
+      item &&
+      (item.id === 'twitch' ||
+        (item.type === 'shortcut' && typeof item.url === 'string' && item.url.includes('twitch.tv')))
+    ) {
+      return {
+        id: 'typesafe',
+        type: 'shortcut',
+        title: 'TypeSafe AI',
+        url: 'https://typesafe.ai/',
+        spaceId: item.spaceId || 'space-home',
+        folderId: item.folderId ?? null,
+        accent: 'slate',
+        customIcon: '/typesafe.png',
+        ogImage: 'https://framerusercontent.com/images/RtIGTDwO43jR4ZDilesXiR5znc.jpg',
+      };
+    }
+    return item;
+  });
+}
+
+function migrateLegacyDockIds(dockIds: string[]): string[] {
+  return dockIds.map((id) => (id === 'twitch' ? 'typesafe' : id));
+}
+
 function getSynchronousPersistedState(): {
   spaces?: typeof SPACES;
-  items?: typeof INITIAL_ITEMS;
+  items?: LaunchpadItem[];
   dockIds?: string[];
   wallpaper?: typeof DEFAULT_WALLPAPER_CONFIG;
   settings?: typeof DEFAULT_SETTINGS;
@@ -271,6 +304,10 @@ function getSynchronousPersistedState(): {
     const parsed = JSON.parse(raw);
     const state = parsed?.state;
     if (state && typeof state === 'object' && Array.isArray(state.items)) {
+      state.items = migrateLegacyItems(state.items);
+      if (Array.isArray(state.dockIds)) {
+        state.dockIds = migrateLegacyDockIds(state.dockIds);
+      }
       return state;
     }
   } catch {}
@@ -1088,6 +1125,29 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         settings: state.settings,
       }),
       onRehydrateStorage: () => (state) => {
+        let hasChanges = false;
+        let nextItems = state?.items;
+        let nextDockIds = state?.dockIds;
+        if (state?.items && Array.isArray(state.items)) {
+          const migrated = migrateLegacyItems(state.items);
+          if (migrated.some((item, i) => item !== state.items[i])) {
+            nextItems = migrated;
+            hasChanges = true;
+          }
+        }
+        if (state?.dockIds && Array.isArray(state.dockIds)) {
+          const dockMigrated = migrateLegacyDockIds(state.dockIds);
+          if (dockMigrated.some((id, i) => id !== state.dockIds[i])) {
+            nextDockIds = dockMigrated;
+            hasChanges = true;
+          }
+        }
+        if (hasChanges) {
+          useLaunchpadStore.setState({
+            items: nextItems,
+            dockIds: nextDockIds,
+          });
+        }
         if (state?.wallpaper) {
           if (state.wallpaper.blur === undefined) {
             state.wallpaper.blur = DEFAULT_WALLPAPER_CONFIG.blur;
@@ -1123,10 +1183,12 @@ export function syncStoreFromExternal(data: unknown) {
     const parsed = typeof data === 'string' ? JSON.parse(data) : data;
     const incomingState = (parsed as { state?: Partial<LaunchpadState> })?.state || (parsed as Partial<LaunchpadState>);
     if (incomingState && Array.isArray(incomingState.items)) {
+      const items = migrateLegacyItems(incomingState.items);
+      const dockIds = incomingState.dockIds ? migrateLegacyDockIds(incomingState.dockIds) : undefined;
       useLaunchpadStore.setState((current) => ({
         ...current,
-        items: incomingState.items ?? current.items,
-        dockIds: incomingState.dockIds ?? current.dockIds,
+        items: items ?? current.items,
+        dockIds: dockIds ?? current.dockIds,
         spaces: incomingState.spaces ?? current.spaces,
         settings: incomingState.settings ? { ...current.settings, ...incomingState.settings } : current.settings,
         wallpaper: incomingState.wallpaper ? { ...current.wallpaper, ...incomingState.wallpaper } : current.wallpaper,
