@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLaunchpadStore } from '@/store/useLaunchpadStore';
+import { cn } from '@/lib/utils';
 
 export function UndoToast() {
   const deletionHistory = useLaunchpadStore((state) => state.deletionHistory) || [];
@@ -9,6 +10,9 @@ export function UndoToast() {
   const undoLastDeletion = useLaunchpadStore((state) => state.undoLastDeletion);
   const dismissUndoToast = useLaunchpadStore((state) => state.dismissUndoToast);
   const clearRestoredNotice = useLaunchpadStore((state) => state.clearRestoredNotice);
+  const spacesEnabled = useLaunchpadStore(
+    (state) => state.settings?.spacesEnabled ?? false,
+  );
 
   const [isMac, setIsMac] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,7 +84,12 @@ export function UndoToast() {
   const showToast = isUndoToastVisible && (Boolean(lastRestoredTitle) || Boolean(lastDeleted));
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-28 z-50 flex justify-center px-4">
+    <div
+      className={cn(
+        "pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4 transition-all duration-200",
+        spacesEnabled ? "bottom-[172px]" : "bottom-36",
+      )}
+    >
       <AnimatePresence mode="wait">
         {showToast && (
           <motion.div
