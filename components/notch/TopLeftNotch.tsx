@@ -12,15 +12,7 @@ export interface NotchNote {
 
 const STORAGE_KEY = "tabin-notch-notes";
 
-const INITIAL_NOTES: NotchNote[] = [
-  {
-    id: "note-1",
-    title: "Quick thoughts",
-    content:
-      "Welcome to Tabin Notes. Jot down quick thoughts, links, or ideas here.\n\nEverything auto-saves locally!",
-    updatedAt: Date.now(),
-  },
-];
+const INITIAL_NOTES: NotchNote[] = [];
 
 function formatRelativeTime(timestamp: number): string {
   if (!timestamp) return "";
