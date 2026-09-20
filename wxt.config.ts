@@ -8,7 +8,7 @@ export default defineConfig({
   vite: () => ({
     plugins: [tailwindcss()],
   }),
-  manifest: {
+  manifest: (env) => ({
     name: "Tabin",
     description:
       "Turn your New Tab into a visual home for your favorite websites.",
@@ -36,5 +36,18 @@ export default defineConfig({
     ],
     host_permissions: ["https://*/*", "http://*/*"],
     optional_permissions: ["bookmarks"],
-  },
+    ...(env.browser === "firefox"
+      ? {
+          browser_specific_settings: {
+            gecko: {
+              id: "tabin@ayushmxxn",
+              strict_min_version: "109.0",
+              data_collection_permissions: {
+                required: ["none"],
+              },
+            },
+          },
+        }
+      : {}),
+  }),
 });
