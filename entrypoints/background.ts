@@ -490,15 +490,25 @@ export default defineBackground(() => {
     await showConfirmation(targetTab?.id, "success", title, destinationName);
   });
 
-  // Handle cross-origin metadata fetch and direct image download requests from newtab/extension pages
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "FETCH_WEBSITE_METADATA" && message.url) {
+  // Handle cross-origin metadata fetch and direct image download requests from newtab/extension pages.
+  // Only honour messages from contexts belonging to this extension (chrome-extension://<own-id>/).
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return;
+
+    const ownOrigin = chrome.runtime.getURL("").replace(/\/$/, "");
+    const isOwnContext =
+      sender.origin === ownOrigin ||
+      (typeof sender.url === "string" && sender.url.startsWith(ownOrigin));
+
+    if (!isOwnContext) return;
+
+    if (message?.type === "FETCH_WEBSITE_METADATA" && typeof message.url === "string") {
       fetchWebsiteMetadataDirect(message.url)
         .then((data) => sendResponse({ success: true, data }))
         .catch((err) => sendResponse({ success: false, error: err?.message }));
       return true;
     }
-    if (message?.type === "DOWNLOAD_IMAGE" && message.url) {
+    if (message?.type === "DOWNLOAD_IMAGE" && typeof message.url === "string") {
       downloadImageAsDataUrlDirect(message.url)
         .then((dataUrl) => sendResponse({ success: true, dataUrl }))
         .catch((err) => sendResponse({ success: false, error: err?.message }));

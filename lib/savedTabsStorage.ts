@@ -3,6 +3,10 @@ import type { SavedTab, SavedTabGroup } from "@/types/savedTabs";
 const STORAGE_KEY = "tabin-saved-tabs";
 const BACKUP_STORAGE_KEY = "tabin-saved-tabs-backup";
 
+function isSafeUrl(url: string): boolean {
+  return /^https?:/i.test(url);
+}
+
 function parseRawGroups(raw: unknown): SavedTabGroup[] | null {
   if (!raw) return null;
   let parsed: unknown;
@@ -636,6 +640,10 @@ export async function restoreTab(
   let focusedExisting = false;
   let restored = false;
 
+  if (!isSafeUrl(tab.url)) {
+    return { restored: false, focusedExisting: false, updated: null };
+  }
+
   if (typeof chrome !== "undefined" && chrome.tabs?.query) {
     try {
       const normTarget = normalizeUrlForDuplicateCheck(tab.url);
@@ -718,6 +726,9 @@ export async function restoreGroup(
     let firstFocusedTab: chrome.tabs.Tab | null = null;
 
     for (const tab of group.tabs) {
+      if (!isSafeUrl(tab.url)) {
+        continue;
+      }
       try {
         const norm = normalizeUrlForDuplicateCheck(tab.url);
         const existingOpen = openUrlMap.get(norm);
@@ -789,6 +800,9 @@ export async function restoreGroup(
     }
   } else {
     for (const tab of group.tabs) {
+      if (!isSafeUrl(tab.url)) {
+        continue;
+      }
       try {
         window.open(tab.url, "_blank", "noopener,noreferrer");
         restoredCount++;

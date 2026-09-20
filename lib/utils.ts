@@ -15,13 +15,14 @@ export function cn(...inputs: ClassValue[]) {
 export function openShortcutUrl(url: string, mode: OpenLinksMode = "newTab") {
   if (!url) return;
   const trimmed = url.trim();
-  if (/^(javascript|vbscript|data):/i.test(trimmed)) {
-    console.warn("Blocked unsafe URL scheme:", trimmed);
-    return;
-  }
   const targetUrl = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)
     ? trimmed
     : `https://${trimmed}`;
+
+  if (!/^https?:/i.test(targetUrl)) {
+    console.warn("Blocked unsafe URL scheme:", targetUrl);
+    return;
+  }
 
   if (mode === "sameTab") {
     if (typeof chrome !== "undefined" && chrome.tabs?.update) {

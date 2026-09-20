@@ -175,6 +175,8 @@ export function AddModal() {
         ? cleanUrl
         : `https://${cleanUrl}`;
 
+    if (!/^https?:/i.test(finalUrl)) return;
+
     const id = addShortcut({
       url: finalUrl,
       title: title.trim() || cleanTitleFromUrl(cleanUrl) || "Bookmark",
