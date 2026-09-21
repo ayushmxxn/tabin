@@ -7,9 +7,73 @@ import {
 } from "@/store/useLaunchpadStore";
 import type { FolderItem, LaunchpadItem, ShortcutItem } from "@/types";
 import { AnimatePresence, motion, Reorder } from "motion/react";
-import { useEffect, useRef, useState, memo, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Folder } from "../folder/Folder";
 import { FolderColorPicker } from "../folder/FolderColorPicker";
+
+function DockTooltip({
+  label,
+  isOpen,
+  targetRef,
+}: {
+  label: string;
+  isOpen: boolean;
+  targetRef: React.RefObject<HTMLElement | null>;
+}) {
+  const [coords, setCoords] = useState<{ left: number; bottom: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const update = () => {
+      if (targetRef.current) {
+        const rect = targetRef.current.getBoundingClientRect();
+        setCoords({
+          left: rect.left + rect.width / 2,
+          bottom: window.innerHeight - rect.top + 16,
+        });
+      }
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [isOpen, targetRef]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && coords && (
+        <div
+          style={{
+            position: "fixed",
+            left: coords.left,
+            bottom: coords.bottom,
+            zIndex: 9999,
+          }}
+          className="pointer-events-none -translate-x-1/2 flex items-center justify-center whitespace-nowrap"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 4, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 2, scale: 0.96 }}
+            transition={{ duration: 0.12, ease: "easeOut" }}
+            className="rounded-lg bg-[#121215]/80 px-2.5 py-1 text-[11px] font-medium tracking-wide text-white/90 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-2xl select-none"
+          >
+            {label}
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+}
 
 const DockFolderItem = memo(function DockFolderItem({
   folder,
@@ -38,6 +102,25 @@ const DockFolderItem = memo(function DockFolderItem({
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const isLongPressTriggeredRef = useRef(false);
 
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+
+  const updateRect = useCallback(() => {
+    if (folderButtonRef.current) {
+      setTriggerRect(folderButtonRef.current.getBoundingClientRect());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isHovered && !isColorPickerOpen) return;
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+    return () => {
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [isHovered, isColorPickerOpen, updateRect]);
+
   const clearLongPress = () => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -46,15 +129,69 @@ const DockFolderItem = memo(function DockFolderItem({
   };
 
   const updateItem = useLaunchpadStore((state) => state.updateItem);
+  const deleteItem = useLaunchpadStore((state) => state.deleteItem);
   const isDragOver = useLaunchpadStore(
     (state) => state.dragOverFolderId === folder.id,
   );
 
+  const [previewColor, setPreviewColor] = useState<string | null>(null);
+  const colorCommitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const pendingColorRef = useRef<string | null>(null);
+
   const isActive = openFolderId === folder.id;
-  const folderColor = folder.color || DEFAULT_FOLDER_COLOR;
+  const folderColor = previewColor ?? folder.color ?? DEFAULT_FOLDER_COLOR;
   const folderChildren = selectFolderChildren(items, folder).filter(
     (item): item is ShortcutItem => item.type === "shortcut",
   );
+
+  const handleColorChange = useCallback(
+    (newColor: string) => {
+      setPreviewColor(newColor);
+      pendingColorRef.current = newColor;
+
+      if (colorCommitTimeoutRef.current) {
+        clearTimeout(colorCommitTimeoutRef.current);
+      }
+
+      colorCommitTimeoutRef.current = setTimeout(() => {
+        if (pendingColorRef.current) {
+          updateItem(folder.id, { color: pendingColorRef.current });
+          pendingColorRef.current = null;
+        }
+      }, 200);
+    },
+    [folder.id, updateItem],
+  );
+
+  useEffect(() => {
+    if (!isColorPickerOpen && pendingColorRef.current) {
+      if (colorCommitTimeoutRef.current) {
+        clearTimeout(colorCommitTimeoutRef.current);
+      }
+      updateItem(folder.id, { color: pendingColorRef.current });
+      pendingColorRef.current = null;
+      setPreviewColor(null);
+    }
+  }, [isColorPickerOpen, folder.id, updateItem]);
+
+  useEffect(() => {
+    return () => {
+      if (colorCommitTimeoutRef.current) {
+        clearTimeout(colorCommitTimeoutRef.current);
+        if (pendingColorRef.current) {
+          updateItem(folder.id, { color: pendingColorRef.current });
+        }
+      }
+    };
+  }, [folder.id, updateItem]);
+
+  useEffect(() => {
+    if (pendingColorRef.current === null) {
+      setPreviewColor(null);
+    }
+  }, [folder.color]);
 
   useEffect(() => {
     setFolderTitle(folder.title);
@@ -74,8 +211,10 @@ const DockFolderItem = memo(function DockFolderItem({
     if (!isColorPickerOpen) return;
     const handleClickOutside = (e: PointerEvent | MouseEvent) => {
       if (
-        containerRef.current &&
-        containerRef.current.contains(e.target as Node)
+        (containerRef.current &&
+          containerRef.current.contains(e.target as Node)) ||
+        (colorPickerRef.current &&
+          colorPickerRef.current.contains(e.target as Node))
       ) {
         return;
       }
@@ -83,8 +222,10 @@ const DockFolderItem = memo(function DockFolderItem({
     };
     const handleContextMenuOutside = (e: MouseEvent) => {
       if (
-        containerRef.current &&
-        containerRef.current.contains(e.target as Node)
+        (containerRef.current &&
+          containerRef.current.contains(e.target as Node)) ||
+        (colorPickerRef.current &&
+          colorPickerRef.current.contains(e.target as Node))
       ) {
         return;
       }
@@ -123,8 +264,13 @@ const DockFolderItem = memo(function DockFolderItem({
   return (
     <div
       ref={containerRef}
-      className="relative flex flex-col items-center"
-      onMouseEnter={() => setIsHovered(true)}
+      className="relative flex flex-col items-center shrink-0"
+      onMouseEnter={() => {
+        if (folderButtonRef.current) {
+          setTriggerRect(folderButtonRef.current.getBoundingClientRect());
+        }
+        setIsHovered(true);
+      }}
       onMouseLeave={() => setIsHovered(false)}
       onContextMenu={(e) => {
         if (
@@ -136,156 +282,224 @@ const DockFolderItem = memo(function DockFolderItem({
         }
         e.preventDefault();
         e.stopPropagation();
+        if (folderButtonRef.current) {
+          setTriggerRect(folderButtonRef.current.getBoundingClientRect());
+        }
         setIsColorPickerOpen((prev) => !prev);
       }}
     >
-      {/* Tooltip on hover (hidden when color picker is open) */}
-      <AnimatePresence>
-        {isHovered && !isColorPickerOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 4, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 2, scale: 0.96 }}
-            transition={{ duration: 0.12, ease: "easeOut" }}
-            className="absolute -top-9.5 z-40 flex items-center justify-center pointer-events-auto"
-          >
-            <div className="flex items-center gap-1.5 rounded-lg bg-[#141414]/98 px-2.5 py-1 text-[11px] font-medium tracking-wide text-white/90 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-2xl whitespace-nowrap select-none">
-              <span>{folder.title}</span>
-              <button
-                type="button"
-                title="Change folder color"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsColorPickerOpen((prev) => !prev);
+      {/* Portaled Tooltip on hover (hidden when color picker is open) */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {isHovered && !isColorPickerOpen && triggerRect && (
+              <div
+                style={{
+                  position: "fixed",
+                  left: triggerRect.left + triggerRect.width / 2,
+                  bottom: window.innerHeight - triggerRect.top + 16,
+                  zIndex: 9999,
                 }}
-                className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full hover:bg-white/15 transition-all cursor-pointer"
+                className="pointer-events-none -translate-x-1/2 flex items-center justify-center whitespace-nowrap"
               >
-                <span
-                  className="h-2.5 w-2.5 rounded-full border border-white/40 shadow-sm"
-                  style={{ backgroundColor: folderColor }}
-                />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Color Customizer Popover */}
-      <AnimatePresence>
-        {isColorPickerOpen && (
-          <motion.div
-            ref={colorPickerRef}
-            initial={{ opacity: 0, y: 6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.98 }}
-            transition={{ duration: 0.14, ease: "easeOut" }}
-            className="absolute bottom-13 z-50 w-[276px] overflow-hidden rounded-xl border border-white/10 bg-[#141414]/98 p-2.5 shadow-[0_16px_40px_-10px_rgba(0,0,0,0.6)] backdrop-blur-2xl select-none"
-            onClick={(e) => e.stopPropagation()}
-            onContextMenu={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-0.5 pb-2 mb-2 border-b border-white/10 min-h-[30px]">
-              {isEditingTitle ? (
-                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
-                  <span
-                    className="h-3 w-3 rounded-full border border-white/30 shadow-sm shrink-0"
-                    style={{ backgroundColor: folderColor }}
-                  />
-                  <input
-                    ref={titleInputRef}
-                    type="text"
-                    value={folderTitle}
-                    onChange={(e) => setFolderTitle(e.target.value)}
-                    onBlur={handleTitleSubmit}
-                    onKeyDown={(e) => {
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 2, scale: 0.96 }}
+                  transition={{ duration: 0.12, ease: "easeOut" }}
+                  className="pointer-events-auto flex items-center gap-1.5 rounded-lg bg-[#121215]/80 px-2.5 py-1 text-[11px] font-medium tracking-wide text-white/90 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-2xl whitespace-nowrap select-none"
+                >
+                  <span>{folder.title}</span>
+                  <button
+                    type="button"
+                    title="Change folder color"
+                    onClick={(e) => {
                       e.stopPropagation();
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleTitleSubmit();
-                      } else if (e.key === "Escape") {
-                        e.preventDefault();
-                        setFolderTitle(folder.title);
-                        setIsEditingTitle(false);
+                      if (folderButtonRef.current) {
+                        setTriggerRect(
+                          folderButtonRef.current.getBoundingClientRect(),
+                        );
                       }
+                      setIsColorPickerOpen((prev) => !prev);
                     }}
-                    className="w-full bg-white/[0.10] border border-white/20 rounded px-1.5 py-0.5 text-[12px] font-medium text-white focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/20"
-                    autoFocus
-                    maxLength={32}
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 min-w-0 mr-2">
-                  <span
-                    className="h-3 w-3 rounded-full border border-white/30 shadow-sm shrink-0"
-                    style={{ backgroundColor: folderColor }}
-                  />
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => {
-                      setIsEditingTitle(true);
-                      setTimeout(() => titleInputRef.current?.focus(), 10);
-                    }}
-                    title="Click to rename"
-                    className="group inline-flex items-center gap-1.5 max-w-[190px] px-1.5 py-0.5 rounded-md hover:bg-white/[0.08] cursor-pointer transition-colors"
+                    className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full hover:bg-white/15 transition-all cursor-pointer"
                   >
-                    <span className="text-[12px] font-medium text-white/90 truncate">
-                      {folder.title}
-                    </span>
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="text-white/45 group-hover:text-white/85 transition-colors shrink-0"
-                    >
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                      <path d="m15 5 4 4" />
-                    </svg>
-                  </div>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => setIsColorPickerOpen(false)}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors text-xs"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Presets & Custom Color Picker */}
-            <FolderColorPicker
-              value={folderColor}
-              onChange={(newColor) =>
-                updateItem(folder.id, { color: newColor })
-              }
-            />
-          </motion.div>
+                    <span
+                      className="h-2.5 w-2.5 rounded-full border border-white/40 shadow-sm"
+                      style={{ backgroundColor: folderColor }}
+                    />
+                  </button>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
 
+      {/* Portaled Color Customizer Popover */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {isColorPickerOpen && triggerRect && (
+              <div
+                style={{
+                  position: "fixed",
+                  left: Math.max(
+                    148,
+                    Math.min(
+                      window.innerWidth - 148,
+                      triggerRect.left + triggerRect.width / 2,
+                    ),
+                  ),
+                  bottom: window.innerHeight - triggerRect.top + 16,
+                  zIndex: 10000,
+                }}
+                className="-translate-x-1/2"
+              >
+                <motion.div
+                  ref={colorPickerRef}
+                  initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                  transition={{ duration: 0.14, ease: "easeOut" }}
+                  className="w-[276px] overflow-hidden rounded-[18px] border border-white/[0.08] bg-[#121215]/75 p-2.5 shadow-[0_28px_80px_-15px_rgba(0,0,0,0.7),inset_0_1px_0_0_rgba(255,255,255,0.09)] backdrop-blur-3xl text-white select-none"
+                  onClick={(e) => e.stopPropagation()}
+                  onContextMenu={(e) => e.stopPropagation()}
+                >
+                  {/* Subtle Top Specular / Ambient Rim */}
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-0.5 pb-2 mb-2 border-b border-white/[0.08] min-h-[30px]">
+                    {isEditingTitle ? (
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+                        <span
+                          className="h-3 w-3 rounded-full border border-white/30 shadow-sm shrink-0"
+                          style={{ backgroundColor: folderColor }}
+                        />
+                        <input
+                          ref={titleInputRef}
+                          type="text"
+                          value={folderTitle}
+                          onChange={(e) => setFolderTitle(e.target.value)}
+                          onBlur={handleTitleSubmit}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleTitleSubmit();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              setFolderTitle(folder.title);
+                              setIsEditingTitle(false);
+                            }
+                          }}
+                          className="w-full bg-white/10 text-xs text-white px-1.5 py-0.5 rounded border border-white/20 outline-none focus:border-white/40 focus:ring-1 focus:ring-white/20"
+                          autoFocus
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="group flex items-center gap-1.5 min-w-0 flex-1 mr-2 cursor-pointer"
+                        onClick={() => {
+                          setIsEditingTitle(true);
+                          setTimeout(() => titleInputRef.current?.select(), 0);
+                        }}
+                        title="Click to rename folder"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full border border-white/30 shadow-sm shrink-0"
+                          style={{ backgroundColor: folderColor }}
+                        />
+                        <span className="text-xs font-medium text-white/90 truncate">
+                          {folder.title}
+                        </span>
+                        <svg
+                          className="w-3 h-3 text-white/40 group-hover:text-white/70 transition-colors shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsColorPickerOpen(false)}
+                      aria-label="Close"
+                      className="flex h-5 w-5 items-center justify-center rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Presets & Custom Color Picker */}
+                  <FolderColorPicker
+                    value={folderColor}
+                    onChange={handleColorChange}
+                    onDelete={() => {
+                      if (colorCommitTimeoutRef.current) {
+                        clearTimeout(colorCommitTimeoutRef.current);
+                      }
+                      pendingColorRef.current = null;
+                      deleteItem(folder.id);
+                      setIsColorPickerOpen(false);
+                    }}
+                  />
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+
+      {/* Main Folder Item Button */}
       <motion.div
         ref={folderButtonRef}
         role="button"
         tabIndex={0}
-        data-dock-folder-id={folder.id}
-        aria-label={`${folder.title} folder`}
+        aria-label={`Open folder ${folder.title}`}
         aria-current={isActive ? "page" : undefined}
         whileTap={{ scale: 0.94 }}
+        whileHover={
+          dockMagnification
+            ? {
+                scale: 1.18,
+                y: -4,
+                transition: { type: "spring", stiffness: 450, damping: 25 },
+              }
+            : undefined
+        }
         onPointerDown={(e) => {
-          if (e.pointerType === 'touch') {
+          if (e.pointerType === "touch") {
             isLongPressTriggeredRef.current = false;
             touchStartPosRef.current = { x: e.clientX, y: e.clientY };
             clearLongPress();
             longPressTimerRef.current = setTimeout(() => {
               isLongPressTriggeredRef.current = true;
+              if (folderButtonRef.current) {
+                setTriggerRect(folderButtonRef.current.getBoundingClientRect());
+              }
               setIsColorPickerOpen((prev) => !prev);
-              if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+              if (typeof navigator !== "undefined" && "vibrate" in navigator) {
                 try {
                   navigator.vibrate(10);
                 } catch {}
@@ -294,25 +508,27 @@ const DockFolderItem = memo(function DockFolderItem({
           }
         }}
         onPointerMove={(e) => {
-          if (touchStartPosRef.current && longPressTimerRef.current) {
-            const dist = Math.hypot(
-              e.clientX - touchStartPosRef.current.x,
-              e.clientY - touchStartPosRef.current.y,
-            );
-            if (dist > 8) {
+          if (touchStartPosRef.current) {
+            const dx = Math.abs(e.clientX - touchStartPosRef.current.x);
+            const dy = Math.abs(e.clientY - touchStartPosRef.current.y);
+            if (dx > 8 || dy > 8) {
               clearLongPress();
             }
           }
         }}
-        onPointerUp={() => clearLongPress()}
-        onPointerCancel={() => clearLongPress()}
-        onClick={() => {
+        onPointerUp={() => {
+          clearLongPress();
+          touchStartPosRef.current = null;
+        }}
+        onPointerCancel={() => {
+          clearLongPress();
+          touchStartPosRef.current = null;
+        }}
+        onClick={(e) => {
           if (isLongPressTriggeredRef.current) {
             isLongPressTriggeredRef.current = false;
-            return;
-          }
-          if (isColorPickerOpen) {
-            setIsColorPickerOpen(false);
+            e.preventDefault();
+            e.stopPropagation();
             return;
           }
           handleClick();
@@ -373,47 +589,76 @@ export function Dock() {
   );
   const spaces = useLaunchpadStore((state) => state.spaces);
   const activeSpaceIndex = useLaunchpadStore((state) => state.activeSpaceIndex);
-  const spacesEnabled = useLaunchpadStore((state) => state.settings?.spacesEnabled ?? false);
-  const activeSpace = spaces[activeSpaceIndex] ?? spaces[0] ?? { id: 'space-home', name: 'Home' };
+  const spacesEnabled = useLaunchpadStore(
+    (state) => state.settings?.spacesEnabled ?? false,
+  );
+  const activeSpace = spaces[activeSpaceIndex] ??
+    spaces[0] ?? { id: "space-home", name: "Home" };
 
   const dockFolders = useMemo(() => {
     const all = selectDockFolders(items, dockIds);
-    return spacesEnabled ? all.filter((f) => f.spaceId === activeSpace.id) : all;
+    return spacesEnabled
+      ? all.filter((f) => f.spaceId === activeSpace.id)
+      : all;
   }, [items, dockIds, spacesEnabled, activeSpace.id]);
+
   const isHomeActive = openFolderId === null;
   const [isHomeHovered, setIsHomeHovered] = useState(false);
   const [isAddHovered, setIsAddHovered] = useState(false);
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
 
+  const homeButtonRef = useRef<HTMLButtonElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+
+  const dockRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const dock = dockRef.current;
+    const scrollEl = scrollContainerRef.current;
+    if (!dock || !scrollEl) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      if (scrollEl.scrollWidth > scrollEl.clientWidth) {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          e.preventDefault();
+          scrollEl.scrollLeft += e.deltaY;
+        }
+      }
+    };
+
+    dock.addEventListener("wheel", handleNativeWheel, { passive: false });
+    return () => {
+      dock.removeEventListener("wheel", handleNativeWheel);
+    };
+  }, []);
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-3.5 z-20 flex justify-center">
+    <div className="pointer-events-none fixed inset-x-0 bottom-3.5 z-20 flex justify-center px-6">
       <div
+        ref={dockRef}
         data-dock="true"
-        className="pointer-events-auto flex items-center gap-3.5 rounded-[20px] border border-white/10 bg-[#141414]/94 p-1.5 shadow-[0_20px_45px_-10px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl"
+        className={cn(
+          "pointer-events-auto relative flex h-[52px] max-w-[calc(100vw-48px)] items-center rounded-[20px] bg-[#121215]/75 p-1.5 shadow-[0_28px_80px_-15px_rgba(0,0,0,0.7)] backdrop-blur-3xl",
+          dockFolders.length === 0 && "gap-3.5",
+        )}
       >
-        {/* Home Destination Button */}
+
+        {/* Home Destination Button (Fixed Left) */}
         <div
-          className="relative flex flex-col items-center"
+          className="relative flex flex-col items-center shrink-0"
           onMouseEnter={() => setIsHomeHovered(true)}
           onMouseLeave={() => setIsHomeHovered(false)}
         >
-          <AnimatePresence>
-            {isHomeHovered && (
-              <motion.div
-                initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 2, scale: 0.96 }}
-                transition={{ duration: 0.12, ease: "easeOut" }}
-                className="pointer-events-none absolute -top-9.5 z-40 flex items-center justify-center whitespace-nowrap"
-              >
-                <div className="rounded-lg bg-[#141414]/98 px-2.5 py-1 text-[11px] font-medium tracking-wide text-white/90 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-2xl select-none">
-                  Home
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <DockTooltip
+            label="Home"
+            isOpen={isHomeHovered}
+            targetRef={homeButtonRef}
+          />
 
           <motion.button
+            ref={homeButtonRef}
             type="button"
             data-dock-home="true"
             whileTap={{ scale: 0.94 }}
@@ -451,129 +696,117 @@ export function Dock() {
           </motion.button>
         </div>
 
-        {/* User Folders (Reorderable) */}
+        {/* User Folders (Scrollable Track between Home & Settings) */}
         {dockFolders.length > 0 && (
-          <Reorder.Group
-            as="div"
-            axis="x"
-            values={dockFolders.map((f) => f.id)}
-            onReorder={reorderDock}
-            className="flex items-center gap-3.5"
+          <div
+            ref={scrollContainerRef}
+            className="no-scrollbar flex min-w-0 flex-auto h-full items-center overflow-x-auto scroll-smooth py-0 px-3"
           >
-            {dockFolders.map((folder) => (
-              <Reorder.Item
-                key={folder.id}
-                value={folder.id}
-                as="div"
-                className="cursor-grab active:cursor-grabbing touch-none"
-                whileDrag={{ scale: 1.04, zIndex: 30 }}
-              >
-                <DockFolderItem
-                  folder={folder}
-                  items={items}
-                  openFolderId={openFolderId}
-                  dockMagnification={dockMagnification}
-                  onOpenFolder={openFolder}
-                  onCloseFolder={closeFolder}
-                />
-              </Reorder.Item>
-            ))}
-          </Reorder.Group>
+            <Reorder.Group
+              as="div"
+              axis="x"
+              values={dockFolders.map((f) => f.id)}
+              onReorder={reorderDock}
+              className="flex items-center gap-3.5 shrink-0"
+            >
+              {dockFolders.map((folder) => (
+                <Reorder.Item
+                  key={folder.id}
+                  value={folder.id}
+                  as="div"
+                  className="cursor-grab active:cursor-grabbing touch-none shrink-0"
+                  whileDrag={{ scale: 1.04, zIndex: 30 }}
+                >
+                  <DockFolderItem
+                    folder={folder}
+                    items={items}
+                    openFolderId={openFolderId}
+                    dockMagnification={dockMagnification}
+                    onOpenFolder={openFolder}
+                    onCloseFolder={closeFolder}
+                  />
+                </Reorder.Item>
+              ))}
+            </Reorder.Group>
+          </div>
         )}
 
-        {/* Add (+) Button */}
-        <div
-          className="relative flex flex-col items-center"
-          onMouseEnter={() => setIsAddHovered(true)}
-          onMouseLeave={() => setIsAddHovered(false)}
-        >
-          <AnimatePresence>
-            {isAddHovered && (
-              <motion.div
-                initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 2, scale: 0.96 }}
-                transition={{ duration: 0.12, ease: "easeOut" }}
-                className="pointer-events-none absolute -top-9.5 z-40 flex items-center justify-center whitespace-nowrap"
-              >
-                <div className="rounded-lg bg-[#141414]/98 px-2.5 py-1 text-[11px] font-medium tracking-wide text-white/90 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-2xl select-none">
-                  Add Shortcut
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.94 }}
-            onClick={() => setAddModalOpen(true)}
-            aria-label="Add Bookmark or Folder"
-            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] text-white/55 transition-all duration-200 hover:text-white hover:bg-white/[0.08] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] active:bg-white/[0.12] cursor-pointer"
+        {/* Action Controls: Add Shortcut and Settings (Fixed Right) */}
+        <div className="flex shrink-0 items-center gap-3.5">
+          {/* Add (+) Button */}
+          <div
+            className="relative flex flex-col items-center shrink-0"
+            onMouseEnter={() => setIsAddHovered(true)}
+            onMouseLeave={() => setIsAddHovered(false)}
           >
-            <svg
-              className="relative z-10 transition-colors duration-200"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </motion.button>
-        </div>
+            <DockTooltip
+              label="Add Shortcut"
+              isOpen={isAddHovered}
+              targetRef={addButtonRef}
+            />
 
-        {/* Settings Button (Grid/Dots icon) */}
-        <div
-          className="relative flex flex-col items-center"
-          onMouseEnter={() => setIsSettingsHovered(true)}
-          onMouseLeave={() => setIsSettingsHovered(false)}
-        >
-          <AnimatePresence>
-            {isSettingsHovered && (
-              <motion.div
-                initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 2, scale: 0.96 }}
-                transition={{ duration: 0.12, ease: "easeOut" }}
-                className="pointer-events-none absolute -top-9.5 z-40 flex items-center justify-center whitespace-nowrap"
+            <motion.button
+              ref={addButtonRef}
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              onClick={() => setAddModalOpen(true)}
+              aria-label="Add Bookmark or Folder"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] text-white/55 transition-all duration-200 hover:text-white hover:bg-white/[0.08] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] active:bg-white/[0.12] cursor-pointer"
+            >
+              <svg
+                className="relative z-10 transition-colors duration-200"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
               >
-                <div className="rounded-lg bg-[#141414]/98 px-2.5 py-1 text-[11px] font-medium tracking-wide text-white/90 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-2xl select-none">
-                  Settings
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </motion.button>
+          </div>
 
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.94 }}
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Launchpad Settings"
-            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] text-white/55 transition-all duration-200 hover:text-white hover:bg-white/[0.08] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] active:bg-white/[0.12] cursor-pointer"
+          {/* Settings Button */}
+          <div
+            className="relative flex flex-col items-center shrink-0"
+            onMouseEnter={() => setIsSettingsHovered(true)}
+            onMouseLeave={() => setIsSettingsHovered(false)}
           >
-            <svg
-              className="relative z-10 transition-colors duration-200"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <DockTooltip
+              label="Settings"
+              isOpen={isSettingsHovered}
+              targetRef={settingsButtonRef}
+            />
+
+            <motion.button
+              ref={settingsButtonRef}
+              type="button"
+              whileTap={{ scale: 0.94 }}
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Launchpad Settings"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] text-white/55 transition-all duration-200 hover:text-white hover:bg-white/[0.08] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)] active:bg-white/[0.12] cursor-pointer"
             >
-              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-            </svg>
-          </motion.button>
+              <svg
+                className="relative z-10 transition-colors duration-200"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+            </motion.button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
-

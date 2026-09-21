@@ -266,17 +266,17 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
               /* Editor View */
               <div>
                 {/* Header */}
-                <div className="flex items-center justify-between px-1 pb-2.5 border-b border-white/[0.08]">
+                <div className="flex items-center justify-between px-1 pb-2.5">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <button
                       type="button"
                       onClick={handleBackToList}
                       title="Back to all notes"
-                      className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-white/[0.14] border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer active:scale-95 shrink-0"
+                      className="flex items-center justify-center p-0.5 text-white/60 hover:text-white transition-colors cursor-pointer active:scale-90 shrink-0"
                     >
                       <svg
-                        width="12"
-                        height="12"
+                        width="13"
+                        height="13"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -297,7 +297,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
                       type="button"
                       onClick={handleCreateNote}
                       title="New note"
-                      className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-[#FA1E76] border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer text-[13px] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] active:scale-95"
+                      className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-[#FA1E76] text-white/70 hover:text-white transition-all cursor-pointer text-[13px] active:scale-95"
                     >
                       <svg
                         width="12"
@@ -317,7 +317,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
                       type="button"
                       onClick={() => handleDeleteNote(activeNote.id)}
                       title="Delete note"
-                      className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-rose-500/20 hover:border-rose-500/30 hover:text-rose-400 border border-white/10 text-white/40 transition-all cursor-pointer active:scale-95"
+                      className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-rose-500/20 hover:text-rose-400 text-white/40 transition-all cursor-pointer active:scale-95"
                     >
                       <svg
                         width="11"
@@ -348,7 +348,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
                     onFocus={() => setIsInputFocused(true)}
                     onBlur={handleInputBlur}
                     placeholder="Title (optional)"
-                    className="w-full bg-white/[0.04] rounded-lg border border-white/10 px-2.5 py-1.5 text-[12.5px] font-medium text-white placeholder-white/35 focus:outline-none focus:border-white/20 transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]"
+                    className="w-full bg-white/[0.04] rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium text-white placeholder-white/35 focus:outline-none transition-all"
                   />
 
                   <textarea
@@ -361,17 +361,13 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
                     onBlur={handleInputBlur}
                     placeholder="Jot down quick thoughts..."
                     rows={6}
-                    className="w-full bg-white/[0.04] rounded-xl border border-white/10 p-2.5 text-[12px] text-white/90 placeholder-white/35 focus:outline-none focus:border-white/20 resize-none leading-relaxed transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="w-full bg-white/[0.04] rounded-xl p-2.5 text-[12px] text-white/90 placeholder-white/35 focus:outline-none resize-none leading-relaxed transition-all no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   />
 
                   {/* Footer status */}
-                  <div className="flex items-center justify-between px-1 text-[10.5px] text-white/40 pt-0.5">
+                  <div className="flex items-center px-1 text-[10.5px] text-white/40 pt-0.5">
                     <span>
                       {charCount} chars • {wordCount} words
-                    </span>
-                    <span className="flex items-center gap-1.5 text-emerald-400/80 font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                      Auto-saved
                     </span>
                   </div>
                 </div>
@@ -380,7 +376,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
               /* List View */
               <div>
                 {/* Header: Title & Action */}
-                <div className="flex items-center justify-between px-1.5 pb-2.5 border-b border-white/[0.08]">
+                <div className="flex items-center justify-between px-1.5 pb-2.5">
                   <div className="flex items-center gap-2">
                     <img
                       src="/apple-notes.png"
@@ -391,7 +387,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
                       Notes
                     </h3>
                     {notes.length > 0 && (
-                      <span className="inline-flex items-center rounded-md border border-white/12 bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-white/60">
+                      <span className="inline-flex items-center rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-white/60">
                         {notes.length}
                       </span>
                     )}
@@ -401,7 +397,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
                     type="button"
                     onClick={handleCreateNote}
                     title="Add new note"
-                    className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-[#FA1E76] border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer text-[13px] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] active:scale-95"
+                    className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-[#FA1E76] text-white/70 hover:text-white transition-all cursor-pointer text-[13px] active:scale-95"
                   >
                     <svg
                       width="12"
@@ -452,7 +448,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
                           {hoveredNoteId === note.id && (
                             <motion.div
                               layoutId="notch-notes-liquid-highlight"
-                              className="absolute inset-0 rounded-xl bg-white/[0.06] ring-1 ring-inset ring-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] pointer-events-none"
+                              className="absolute inset-0 rounded-xl bg-white/[0.06] pointer-events-none"
                               transition={{
                                 type: "spring",
                                 stiffness: 400,
@@ -480,7 +476,7 @@ export const TopLeftNotch = memo(function TopLeftNotch() {
 
                           {/* Right: Relative time & delete action */}
                           <div className="relative z-10 flex items-center gap-1.5 shrink-0">
-                            <span className="inline-flex items-center rounded-md border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/60 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]">
+                            <span className="inline-flex items-center rounded-md bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/60">
                               {formatRelativeTime(note.updatedAt)}
                             </span>
 

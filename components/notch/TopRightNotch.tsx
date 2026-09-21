@@ -136,6 +136,7 @@ const SimpleTimeDropdown = memo(function SimpleTimeDropdown({
   align = "left",
 }: SimpleTimeDropdownProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const [hoveredSlot, setHoveredSlot] = useState<string | null>(null);
 
   useEffect(() => {
     const selectedEl = listRef.current?.querySelector<HTMLElement>(
@@ -155,10 +156,11 @@ const SimpleTimeDropdown = memo(function SimpleTimeDropdown({
       onClick={(e) => e.stopPropagation()}
       className={`absolute top-[calc(100%+6px)] ${
         align === "right" ? "right-0" : "left-0"
-      } z-50 w-44 rounded-2xl bg-[#121214]/98 border border-white/12 p-1.5 shadow-[0_24px_60px_-10px_rgba(0,0,0,0.75),inset_0_1px_0_0_rgba(255,255,255,0.1)] backdrop-blur-3xl`}
+      } z-50 w-44 rounded-2xl bg-[#121214]/98 p-1.5 shadow-[0_24px_60px_-10px_rgba(0,0,0,0.75)] backdrop-blur-3xl`}
     >
       <div
         ref={listRef}
+        onMouseLeave={() => setHoveredSlot(null)}
         className="max-h-48 overflow-y-auto space-y-0.5 no-scrollbar [scrollbar-width:none] pr-0.5"
       >
         {TIME_SLOTS.map((slot) => {
@@ -172,20 +174,32 @@ const SimpleTimeDropdown = memo(function SimpleTimeDropdown({
               key={slot.time24}
               type="button"
               data-selected={isSelected}
+              onMouseEnter={() => setHoveredSlot(slot.time24)}
               onClick={() => {
                 onChange(slot.time24);
                 onClose();
               }}
-              className={`w-full px-2.5 py-1.5 rounded-lg text-[11px] flex items-center justify-between transition-all cursor-pointer ${
+              className={`relative w-full px-2.5 py-1.5 rounded-lg text-[11px] flex items-center justify-between transition-colors cursor-pointer ${
                 isSelected
                   ? "bg-[#FA1E76] text-white font-semibold shadow-sm"
-                  : "text-white/70 hover:text-white hover:bg-white/[0.08]"
+                  : "text-white/70 hover:text-white"
               }`}
             >
-              <span>{slot.label}</span>
+              {hoveredSlot === slot.time24 && !isSelected && (
+                <motion.div
+                  layoutId="notch-time-slot-liquid-highlight"
+                  className="absolute inset-0 rounded-lg bg-white/[0.08] pointer-events-none"
+                  transition={{
+                    type: "spring",
+                    stiffness: 450,
+                    damping: 35,
+                  }}
+                />
+              )}
+              <span className="relative z-10">{slot.label}</span>
               {durationInfo && (
                 <span
-                  className={`text-[10px] font-normal ${
+                  className={`relative z-10 text-[10px] font-normal transition-colors ${
                     isSelected ? "text-white/90" : "text-white/35"
                   }`}
                 >
@@ -428,7 +442,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
             className="p-3 pb-4"
           >
             {/* Header: Title & Action */}
-            <div className="flex items-center justify-between px-1.5 pb-2.5 border-b border-white/[0.08]">
+            <div className="flex items-center justify-between px-1.5 pb-2.5">
               <h3 className="text-[14px] font-semibold text-white/95 tracking-tight">
                 Tasks
               </h3>
@@ -439,7 +453,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                   setTimeout(() => inputRef.current?.focus(), 50);
                 }}
                 title={isAdding ? "Close form" : "Add task"}
-                className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-[#FA1E76] border border-white/10 text-white/70 hover:text-white transition-all cursor-pointer text-[13px] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] active:scale-95"
+                className="flex items-center justify-center h-6 w-6 rounded-lg bg-white/[0.08] hover:bg-[#FA1E76] text-white/70 hover:text-white transition-all cursor-pointer text-[13px] active:scale-95"
               >
                 <svg
                   width="12"
@@ -479,7 +493,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                       {hoveredTodoId === todo.id && (
                         <motion.div
                           layoutId="notch-tasks-liquid-highlight"
-                          className="absolute inset-0 rounded-xl bg-white/[0.06] ring-1 ring-inset ring-white/[0.08] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] pointer-events-none"
+                          className="absolute inset-0 rounded-xl bg-white/[0.06] pointer-events-none"
                           transition={{
                             type: "spring",
                             stiffness: 400,
@@ -544,7 +558,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
 
                       {/* Right: Squircle Duration badge & delete action */}
                       <div className="relative z-10 flex items-center gap-1.5 shrink-0">
-                        <span className="inline-flex items-center rounded-md border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] transition-colors">
+                        <span className="inline-flex items-center rounded-md bg-white/[0.06] px-2 py-0.5 text-[10px] font-medium text-white/70 transition-colors">
                           {todo.duration || "Anytime"}
                         </span>
 
@@ -585,7 +599,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.15 }}
                   onSubmit={handleAddTodo}
-                  className="pt-2.5 mt-2 border-t border-white/[0.08] space-y-2.5 relative pb-0.5"
+                  className="pt-2.5 mt-2 space-y-2.5 relative pb-0.5"
                 >
                   <div className="flex items-center gap-1.5 w-full">
                     <input
@@ -596,7 +610,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
                       placeholder="What's next? (e.g. Design review)"
-                      className="min-w-0 flex-1 h-[34px] rounded-[9px] bg-white/[0.06] border border-white/12 px-3 text-[12px] text-white placeholder-white/35 focus:outline-none focus:ring-0 transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
+                      className="min-w-0 flex-1 h-[34px] rounded-[9px] bg-white/[0.06] px-3 text-[12px] text-white placeholder-white/35 focus:outline-none focus:ring-0 transition-all"
                     />
                     <button
                       type="submit"
@@ -613,7 +627,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
                       <button
                         type="button"
                         onClick={() => setHasTimeRange(true)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.06] hover:bg-white/[0.10] hover:border-white/20 px-2.5 py-1 text-[11px] font-medium text-white/75 hover:text-white transition-all cursor-pointer shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] active:scale-95"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.10] px-2.5 py-1 text-[11px] font-medium text-white/75 hover:text-white transition-all cursor-pointer active:scale-95"
                       >
                         <svg
                           width="10"
@@ -643,10 +657,10 @@ export const TopRightNotch = memo(function TopRightNotch() {
                                 activeTimePicker === "start" ? null : "start",
                               )
                             }
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium border whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                               activeTimePicker === "start"
-                                ? "bg-[#FA1E76]/20 border-[#FA1E76]/60 text-white shadow-sm ring-1 ring-[#FA1E76]/40"
-                                : "bg-white/[0.06] border-white/12 text-white/90 hover:border-white/25 hover:bg-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                                ? "bg-[#FA1E76]/20 text-white shadow-sm"
+                                : "bg-white/[0.06] text-white/90 hover:bg-white/[0.09]"
                             }`}
                           >
                             <span>{formatDisplayTime(startTime)}</span>
@@ -691,10 +705,10 @@ export const TopRightNotch = memo(function TopRightNotch() {
                                 activeTimePicker === "end" ? null : "end",
                               )
                             }
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium border whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                               activeTimePicker === "end"
-                                ? "bg-[#FA1E76]/20 border-[#FA1E76]/60 text-white shadow-sm ring-1 ring-[#FA1E76]/40"
-                                : "bg-white/[0.06] border-white/12 text-white/90 hover:border-white/25 hover:bg-white/[0.09] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)]"
+                                ? "bg-[#FA1E76]/20 text-white shadow-sm"
+                                : "bg-white/[0.06] text-white/90 hover:bg-white/[0.09]"
                             }`}
                           >
                             <span>{formatDisplayTime(endTime)}</span>
@@ -731,7 +745,7 @@ export const TopRightNotch = memo(function TopRightNotch() {
 
                       <div className="flex items-center gap-1.5 shrink-0">
                         {computedTime && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/[0.08] border border-white/15 text-white/70 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] text-[10.5px] font-medium whitespace-nowrap">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/[0.08] text-white/70 text-[10.5px] font-medium whitespace-nowrap">
                             {computedTime.durationStr}
                           </span>
                         )}
