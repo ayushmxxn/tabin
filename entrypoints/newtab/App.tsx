@@ -10,6 +10,7 @@ import { TopRightNotch } from "@/components/notch/TopRightNotch";
 import { cn } from "@/lib/utils";
 import { syncStoreFromExternal, useLaunchpadStore } from "@/store/useLaunchpadStore";
 import { backfillShortcutsOgImages } from "@/lib/ogBackfill";
+import { initAutoBackup } from "@/lib/autoBackup";
 import { lazy, Suspense, useEffect } from "react";
 
 const SettingsModal = lazy(() =>
@@ -34,6 +35,11 @@ export default function App() {
   // Backfill OG images for existing shortcuts saved without them
   useEffect(() => {
     backfillShortcutsOgImages().catch(() => {});
+  }, []);
+
+  // Initialize automatic local backup
+  useEffect(() => {
+    return initAutoBackup();
   }, []);
 
   useEffect(() => {

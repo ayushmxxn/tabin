@@ -1,8 +1,6 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { INITIAL_DOCK_IDS, INITIAL_ITEMS, SPACES } from '@/data/mockBookmarks';
-import { DEFAULT_WALLPAPER_CONFIG } from '@/data/wallpapers';
-import { DEFAULT_FOLDER_COLOR } from '@/lib/folderColors';
+import { INITIAL_DOCK_IDS, INITIAL_ITEMS, SPACES } from "@/data/mockBookmarks";
+import { DEFAULT_WALLPAPER_CONFIG } from "@/data/wallpapers";
+import { DEFAULT_FOLDER_COLOR } from "@/lib/folderColors";
 import type {
   AccentToken,
   FolderItem,
@@ -12,18 +10,20 @@ import type {
   ShortcutItem,
   Space,
   WallpaperConfig,
-} from '@/types';
+} from "@/types";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 export const DEFAULT_SETTINGS: LaunchpadSettings = {
-  gridColumns: 'auto',
-  iconScale: 'standard',
+  gridColumns: "auto",
+  iconScale: "standard",
   dockMagnification: false,
   dockScale: 48,
-  searchEngine: 'google',
+  searchEngine: "google",
   spacesEnabled: false,
-  defaultSpaceId: 'space-home',
-  openLinks: 'newTab',
-  shortcutStyle: 'icons',
+  defaultSpaceId: "space-home",
+  openLinks: "newTab",
+  shortcutStyle: "icons",
 };
 
 export interface DeletionRecord {
@@ -152,34 +152,34 @@ const dualStorageAdapter = {
   getItem: async (name: string): Promise<string | null> => {
     const backupKey = `${name}_backup`;
     const isValidJson = (val: unknown): boolean => {
-      if (typeof val !== 'string') return false;
+      if (typeof val !== "string") return false;
       try {
         const parsed = JSON.parse(val);
-        return parsed !== null && typeof parsed === 'object';
+        return parsed !== null && typeof parsed === "object";
       } catch {
         return false;
       }
     };
 
     // 1. Try primary chrome.storage.local
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
       try {
         const result = await chrome.storage.local.get([name, backupKey]);
         if (result && result[name]) {
           const raw = result[name];
-          if (typeof raw === 'string' && isValidJson(raw)) {
+          if (typeof raw === "string" && isValidJson(raw)) {
             return raw;
-          } else if (typeof raw === 'object') {
+          } else if (typeof raw === "object") {
             return JSON.stringify(raw);
           }
         }
         // If primary corrupted or missing, try chrome.storage backup snapshot
         if (result && result[backupKey]) {
           const rawBackup = result[backupKey];
-          if (typeof rawBackup === 'string' && isValidJson(rawBackup)) {
+          if (typeof rawBackup === "string" && isValidJson(rawBackup)) {
             chrome.storage.local.set({ [name]: rawBackup }).catch(() => {});
             return rawBackup;
-          } else if (typeof rawBackup === 'object') {
+          } else if (typeof rawBackup === "object") {
             const str = JSON.stringify(rawBackup);
             chrome.storage.local.set({ [name]: str }).catch(() => {});
             return str;
@@ -189,19 +189,23 @@ const dualStorageAdapter = {
     }
 
     // 2. Try localStorage mirror
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== "undefined") {
       try {
         const localVal = localStorage.getItem(name);
         if (localVal && isValidJson(localVal)) {
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.set({ [name]: localVal, [backupKey]: localVal }).catch(() => {});
+          if (typeof chrome !== "undefined" && chrome.storage?.local) {
+            chrome.storage.local
+              .set({ [name]: localVal, [backupKey]: localVal })
+              .catch(() => {});
           }
           return localVal;
         }
         const localBackup = localStorage.getItem(backupKey);
         if (localBackup && isValidJson(localBackup)) {
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.set({ [name]: localBackup, [backupKey]: localBackup }).catch(() => {});
+          if (typeof chrome !== "undefined" && chrome.storage?.local) {
+            chrome.storage.local
+              .set({ [name]: localBackup, [backupKey]: localBackup })
+              .catch(() => {});
           }
           return localBackup;
         }
@@ -212,44 +216,44 @@ const dualStorageAdapter = {
   setItem: async (name: string, value: string): Promise<void> => {
     try {
       const parsed = JSON.parse(value);
-      if (!parsed || typeof parsed !== 'object') return;
+      if (!parsed || typeof parsed !== "object") return;
     } catch {
-      console.error('Refusing to persist invalid JSON:', name);
+      console.error("Refusing to persist invalid JSON:", name);
       return;
     }
 
-    if (name === 'launchpad-storage') {
+    if (name === "launchpad-storage") {
       lastWrittenStorageString = value;
     }
 
     const backupKey = `${name}_backup`;
 
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
       try {
         await chrome.storage.local.set({ [name]: value, [backupKey]: value });
       } catch (err) {
-        console.warn('Failed to write to chrome.storage.local:', err);
+        console.warn("Failed to write to chrome.storage.local:", err);
       }
     }
 
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== "undefined") {
       try {
         localStorage.setItem(name, value);
         localStorage.setItem(backupKey, value);
       } catch (err) {
-        console.warn('Failed to write to localStorage:', err);
+        console.warn("Failed to write to localStorage:", err);
       }
     }
   },
   removeItem: async (name: string): Promise<void> => {
     const backupKey = `${name}_backup`;
-    if (typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== "undefined") {
       try {
         localStorage.removeItem(name);
         localStorage.removeItem(backupKey);
       } catch {}
     }
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
       try {
         await chrome.storage.local.remove([name, backupKey]);
       } catch {}
@@ -259,27 +263,30 @@ const dualStorageAdapter = {
 
 function migrateLegacyItems(items: LaunchpadItem[]): LaunchpadItem[] {
   return items.map((item) => {
-    if (item.type === 'folder' && Array.isArray(item.itemIds)) {
+    if (item.type === "folder" && Array.isArray(item.itemIds)) {
       return {
         ...item,
-        itemIds: item.itemIds.map((id) => (id === 'twitch' ? 'typesafe' : id)),
+        itemIds: item.itemIds.map((id) => (id === "twitch" ? "typesafe" : id)),
       };
     }
     if (
       item &&
-      (item.id === 'twitch' ||
-        (item.type === 'shortcut' && typeof item.url === 'string' && item.url.includes('twitch.tv')))
+      (item.id === "twitch" ||
+        (item.type === "shortcut" &&
+          typeof item.url === "string" &&
+          item.url.includes("twitch.tv")))
     ) {
       return {
-        id: 'typesafe',
-        type: 'shortcut',
-        title: 'TypeSafe AI',
-        url: 'https://typesafe.ai/',
-        spaceId: item.spaceId || 'space-home',
+        id: "typesafe",
+        type: "shortcut",
+        title: "TypeSafe AI",
+        url: "https://typesafe.ai/",
+        spaceId: item.spaceId || "space-home",
         folderId: item.folderId ?? null,
-        accent: 'slate',
-        customIcon: '/typesafe.png',
-        ogImage: 'https://framerusercontent.com/images/RtIGTDwO43jR4ZDilesXiR5znc.jpg',
+        accent: "slate",
+        customIcon: "/typesafe.png",
+        ogImage:
+          "https://framerusercontent.com/images/RtIGTDwO43jR4ZDilesXiR5znc.jpg",
       };
     }
     return item;
@@ -287,7 +294,7 @@ function migrateLegacyItems(items: LaunchpadItem[]): LaunchpadItem[] {
 }
 
 function migrateLegacyDockIds(dockIds: string[]): string[] {
-  return dockIds.map((id) => (id === 'twitch' ? 'typesafe' : id));
+  return dockIds.map((id) => (id === "twitch" ? "typesafe" : id));
 }
 
 function getSynchronousPersistedState(): {
@@ -297,13 +304,13 @@ function getSynchronousPersistedState(): {
   wallpaper?: typeof DEFAULT_WALLPAPER_CONFIG;
   settings?: typeof DEFAULT_SETTINGS;
 } | null {
-  if (typeof localStorage === 'undefined') return null;
+  if (typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem('launchpad-storage');
+    const raw = localStorage.getItem("launchpad-storage");
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const state = parsed?.state;
-    if (state && typeof state === 'object' && Array.isArray(state.items)) {
+    if (state && typeof state === "object" && Array.isArray(state.items)) {
       state.items = migrateLegacyItems(state.items);
       if (Array.isArray(state.dockIds)) {
         state.dockIds = migrateLegacyDockIds(state.dockIds);
@@ -319,25 +326,38 @@ const syncSeed = getSynchronousPersistedState();
 export const useLaunchpadStore = create<LaunchpadState>()(
   persist(
     (set, get) => ({
-      spaces: syncSeed?.spaces && Array.isArray(syncSeed.spaces) ? syncSeed.spaces : SPACES,
+      spaces:
+        syncSeed?.spaces && Array.isArray(syncSeed.spaces)
+          ? syncSeed.spaces
+          : SPACES,
       activeSpaceIndex: 0,
-      items: syncSeed?.items && Array.isArray(syncSeed.items) ? syncSeed.items : INITIAL_ITEMS,
-      dockIds: syncSeed?.dockIds && Array.isArray(syncSeed.dockIds) ? syncSeed.dockIds : INITIAL_DOCK_IDS,
+      items:
+        syncSeed?.items && Array.isArray(syncSeed.items)
+          ? syncSeed.items
+          : INITIAL_ITEMS,
+      dockIds:
+        syncSeed?.dockIds && Array.isArray(syncSeed.dockIds)
+          ? syncSeed.dockIds
+          : INITIAL_DOCK_IDS,
       openFolderId: null,
       activeShortcutMenuId: null,
       setActiveShortcutMenuId: (id) => set({ activeShortcutMenuId: id }),
       hoveredShortcutId: null,
       setHoveredShortcutId: (id) => set({ hoveredShortcutId: id }),
       isSearchOpen: false,
-      searchQuery: '',
+      searchQuery: "",
 
       // Deletion & Undo
       deletionHistory: [],
       lastRestoredTitle: null,
       isUndoToastVisible: false,
 
-      wallpaper: syncSeed?.wallpaper ? { ...DEFAULT_WALLPAPER_CONFIG, ...syncSeed.wallpaper } : DEFAULT_WALLPAPER_CONFIG,
-      settings: syncSeed?.settings ? { ...DEFAULT_SETTINGS, ...syncSeed.settings } : DEFAULT_SETTINGS,
+      wallpaper: syncSeed?.wallpaper
+        ? { ...DEFAULT_WALLPAPER_CONFIG, ...syncSeed.wallpaper }
+        : DEFAULT_WALLPAPER_CONFIG,
+      settings: syncSeed?.settings
+        ? { ...DEFAULT_SETTINGS, ...syncSeed.settings }
+        : DEFAULT_SETTINGS,
       isSettingsOpen: false,
       isAddModalOpen: false,
 
@@ -368,7 +388,11 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
       setActiveSpaceIndex: (index) => {
         const clamped = Math.max(0, Math.min(index, get().spaces.length - 1));
-        set({ activeSpaceIndex: clamped, activePageIndex: 0, openFolderId: null });
+        set({
+          activeSpaceIndex: clamped,
+          activePageIndex: 0,
+          openFolderId: null,
+        });
       },
       goToNextSpace: () => {
         const { activeSpaceIndex, spaces } = get();
@@ -384,7 +408,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       },
 
       createSpace: (name) => {
-        const trimmed = name.trim() || 'New Space';
+        const trimmed = name.trim() || "New Space";
         const newSpace: Space = {
           id: `space-${Date.now()}`,
           name: trimmed,
@@ -399,12 +423,14 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         const trimmed = name.trim();
         if (!trimmed) return;
         set((state) => ({
-          spaces: state.spaces.map((s) => (s.id === id ? { ...s, name: trimmed } : s)),
+          spaces: state.spaces.map((s) =>
+            s.id === id ? { ...s, name: trimmed } : s,
+          ),
         }));
       },
 
       deleteSpace: (id) => {
-        if (id === 'space-home') return;
+        if (id === "space-home") return;
         const { spaces, activeSpaceIndex, settings } = get();
         const spaceToDeleteIndex = spaces.findIndex((s) => s.id === id);
         if (spaceToDeleteIndex === -1) return;
@@ -419,7 +445,9 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         }
 
         const nextDefaultSpaceId =
-          settings.defaultSpaceId === id ? 'space-home' : (settings.defaultSpaceId ?? 'space-home');
+          settings.defaultSpaceId === id
+            ? "space-home"
+            : (settings.defaultSpaceId ?? "space-home");
 
         set((state) => ({
           spaces: nextSpaces,
@@ -460,7 +488,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       switchSpace: (idOrIndex) => {
         const { spaces } = get();
         let index: number;
-        if (typeof idOrIndex === 'number') {
+        if (typeof idOrIndex === "number") {
           index = Math.max(0, Math.min(idOrIndex, spaces.length - 1));
         } else {
           index = spaces.findIndex((s) => s.id === idOrIndex);
@@ -481,18 +509,33 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         }));
       },
 
-      addShortcut: ({ title, url, spaceId, folderId, accent = 'violet', addToDock = false, customIcon, ogImage }) => {
+      addShortcut: ({
+        title,
+        url,
+        spaceId,
+        folderId,
+        accent = "violet",
+        addToDock = false,
+        customIcon,
+        ogImage,
+      }) => {
         const spacesEnabled = get().settings?.spacesEnabled ?? false;
-        const targetSpaceId = spaceId ?? (spacesEnabled ? (get().spaces[get().activeSpaceIndex]?.id ?? 'space-home') : 'space-home');
-        const targetFolderId = folderId !== undefined ? folderId : get().openFolderId;
+        const targetSpaceId =
+          spaceId ??
+          (spacesEnabled
+            ? (get().spaces[get().activeSpaceIndex]?.id ?? "space-home")
+            : "space-home");
+        const targetFolderId =
+          folderId !== undefined ? folderId : get().openFolderId;
         const id = `shortcut-${Date.now()}`;
-        const normalizedUrl = url.startsWith('http://') || url.startsWith('https://')
-          ? url
-          : `https://${url}`;
+        const normalizedUrl =
+          url.startsWith("http://") || url.startsWith("https://")
+            ? url
+            : `https://${url}`;
         const newItem: ShortcutItem = {
           id,
-          type: 'shortcut',
-          title: title.trim() || 'Bookmark',
+          type: "shortcut",
+          title: title.trim() || "Bookmark",
           url: normalizedUrl,
           spaceId: targetSpaceId,
           folderId: targetFolderId,
@@ -504,10 +547,12 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           let updatedItems = [...state.items, newItem];
           if (targetFolderId) {
             updatedItems = updatedItems.map((item) => {
-              if (item.type === 'folder' && item.id === targetFolderId) {
+              if (item.type === "folder" && item.id === targetFolderId) {
                 return {
                   ...item,
-                  itemIds: item.itemIds.includes(id) ? item.itemIds : [...item.itemIds, id],
+                  itemIds: item.itemIds.includes(id)
+                    ? item.itemIds
+                    : [...item.itemIds, id],
                 };
               }
               return item;
@@ -525,16 +570,20 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         title,
         spaceId,
         itemIds = [],
-        accent = 'blue',
+        accent = "blue",
         color = DEFAULT_FOLDER_COLOR,
       }) => {
         const spacesEnabled = get().settings?.spacesEnabled ?? false;
-        const targetSpaceId = spaceId ?? (spacesEnabled ? (get().spaces[get().activeSpaceIndex]?.id ?? 'space-home') : 'space-home');
+        const targetSpaceId =
+          spaceId ??
+          (spacesEnabled
+            ? (get().spaces[get().activeSpaceIndex]?.id ?? "space-home")
+            : "space-home");
         const id = `folder-${Date.now()}`;
         const newFolder: FolderItem = {
           id,
-          type: 'folder',
-          title: title.trim() || 'New Folder',
+          type: "folder",
+          title: title.trim() || "New Folder",
           spaceId: targetSpaceId,
           folderId: null,
           itemIds,
@@ -558,21 +607,25 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         const targetItem = state.items.find((item) => item.id === id);
         if (!targetItem) return;
 
-        const originalItemIndex = state.items.findIndex((item) => item.id === id);
+        const originalItemIndex = state.items.findIndex(
+          (item) => item.id === id,
+        );
         const dockIndex = state.dockIds.indexOf(id);
 
         let containedItems: LaunchpadItem[] | undefined;
         let parentFolderId: string | null = null;
         let parentFolderIndex: number = -1;
 
-        if (targetItem.type === 'folder') {
+        if (targetItem.type === "folder") {
           containedItems = state.items.filter(
-            (item) => item.folderId === id || targetItem.itemIds.includes(item.id),
+            (item) =>
+              item.folderId === id || targetItem.itemIds.includes(item.id),
           );
         } else if (targetItem.folderId) {
           parentFolderId = targetItem.folderId;
           const parentFolder = state.items.find(
-            (i): i is FolderItem => i.type === 'folder' && i.id === parentFolderId,
+            (i): i is FolderItem =>
+              i.type === "folder" && i.id === parentFolderId,
           );
           if (parentFolder) {
             parentFolderIndex = parentFolder.itemIds.indexOf(id);
@@ -597,16 +650,24 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           items: currentState.items
             .filter((item) => item.id !== id && item.folderId !== id)
             .map((item) =>
-              item.type === 'folder' && item.itemIds.includes(id)
-                ? { ...item, itemIds: item.itemIds.filter((childId) => childId !== id) }
+              item.type === "folder" && item.itemIds.includes(id)
+                ? {
+                    ...item,
+                    itemIds: item.itemIds.filter((childId) => childId !== id),
+                  }
                 : item,
             ),
           dockIds: currentState.dockIds.filter((dockId) => dockId !== id),
-          openFolderId: currentState.openFolderId === id ? null : currentState.openFolderId,
+          openFolderId:
+            currentState.openFolderId === id ? null : currentState.openFolderId,
           activeShortcutMenuId:
-            currentState.activeShortcutMenuId === id ? null : currentState.activeShortcutMenuId,
+            currentState.activeShortcutMenuId === id
+              ? null
+              : currentState.activeShortcutMenuId,
           hoveredShortcutId:
-            currentState.hoveredShortcutId === id ? null : currentState.hoveredShortcutId,
+            currentState.hoveredShortcutId === id
+              ? null
+              : currentState.hoveredShortcutId,
         }));
       },
 
@@ -644,7 +705,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           let finalItems = restoredItems;
           if (record.parentFolderId) {
             finalItems = finalItems.map((item) => {
-              if (item.id === record.parentFolderId && item.type === 'folder') {
+              if (item.id === record.parentFolderId && item.type === "folder") {
                 if (!item.itemIds.includes(record.id)) {
                   const nextItemIds = [...item.itemIds];
                   if (
@@ -665,8 +726,14 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
           // 4. If it was in dock, restore into dockIds
           const nextDockIds = [...state.dockIds];
-          if (record.dockIndex !== undefined && !nextDockIds.includes(record.id)) {
-            if (record.dockIndex >= 0 && record.dockIndex <= nextDockIds.length) {
+          if (
+            record.dockIndex !== undefined &&
+            !nextDockIds.includes(record.id)
+          ) {
+            if (
+              record.dockIndex >= 0 &&
+              record.dockIndex <= nextDockIds.length
+            ) {
               nextDockIds.splice(record.dockIndex, 0, record.id);
             } else {
               nextDockIds.push(record.id);
@@ -699,9 +766,16 @@ export const useLaunchpadStore = create<LaunchpadState>()(
             if (item.id !== id) return item;
             const nextUpdates = { ...updates };
             // Never reset an existing valid ogImage with null or undefined
-            if (item.type === 'shortcut' && item.ogImage && 'ogImage' in nextUpdates) {
+            if (
+              item.type === "shortcut" &&
+              item.ogImage &&
+              "ogImage" in nextUpdates
+            ) {
               const targetUpdates = nextUpdates as { ogImage?: string | null };
-              if (targetUpdates.ogImage === null || targetUpdates.ogImage === undefined) {
+              if (
+                targetUpdates.ogImage === null ||
+                targetUpdates.ogImage === undefined
+              ) {
                 delete targetUpdates.ogImage;
               }
             }
@@ -716,14 +790,17 @@ export const useLaunchpadStore = create<LaunchpadState>()(
             if (item.id === shortcutId) {
               return { ...item, folderId };
             }
-            if (item.type === 'folder') {
+            if (item.type === "folder") {
               const isTarget = item.id === folderId;
               const alreadyHas = item.itemIds.includes(shortcutId);
               if (isTarget && !alreadyHas) {
                 return { ...item, itemIds: [...item.itemIds, shortcutId] };
               }
               if (!isTarget && alreadyHas) {
-                return { ...item, itemIds: item.itemIds.filter((id) => id !== shortcutId) };
+                return {
+                  ...item,
+                  itemIds: item.itemIds.filter((id) => id !== shortcutId),
+                };
               }
             }
             return item;
@@ -737,12 +814,16 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
         if (openFolderId) {
           const folder = items.find(
-            (item): item is FolderItem => item.type === 'folder' && item.id === openFolderId,
+            (item): item is FolderItem =>
+              item.type === "folder" && item.id === openFolderId,
           );
           if (!folder) return;
           const currentIndex = folder.itemIds.indexOf(fromId);
           if (currentIndex === -1) return;
-          const clampedTarget = Math.min(Math.max(targetIndex, 0), folder.itemIds.length - 1);
+          const clampedTarget = Math.min(
+            Math.max(targetIndex, 0),
+            folder.itemIds.length - 1,
+          );
 
           const nextItemIds = [...folder.itemIds];
           const [movedId] = nextItemIds.splice(currentIndex, 1);
@@ -768,11 +849,18 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
           const spaceShortcuts = items.filter(
             (item): item is ShortcutItem =>
-              item.folderId === null && item.spaceId === activeSpace.id && item.type === 'shortcut',
+              item.folderId === null &&
+              item.spaceId === activeSpace.id &&
+              item.type === "shortcut",
           );
-          const currentIndex = spaceShortcuts.findIndex((item) => item.id === fromId);
+          const currentIndex = spaceShortcuts.findIndex(
+            (item) => item.id === fromId,
+          );
           if (currentIndex === -1) return;
-          const clampedTarget = Math.min(Math.max(targetIndex, 0), spaceShortcuts.length - 1);
+          const clampedTarget = Math.min(
+            Math.max(targetIndex, 0),
+            spaceShortcuts.length - 1,
+          );
 
           const nextSpaceShortcuts = [...spaceShortcuts];
           const [movedItem] = nextSpaceShortcuts.splice(currentIndex, 1);
@@ -782,7 +870,11 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
           let spaceIndex = 0;
           const newItems = items.map((item) => {
-            if (item.folderId === null && item.spaceId === activeSpace.id && item.type === 'shortcut') {
+            if (
+              item.folderId === null &&
+              item.spaceId === activeSpace.id &&
+              item.type === "shortcut"
+            ) {
               const replacement = nextSpaceShortcuts[spaceIndex++] ?? item;
               const { position: _pos, ...cleanItem } = replacement;
               return cleanItem as LaunchpadItem;
@@ -803,7 +895,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
         const existingUrls = new Set<string>();
         for (const item of items) {
-          if (item.type === 'shortcut' && item.url) {
+          if (item.type === "shortcut" && item.url) {
             existingUrls.add(item.url.toLowerCase());
           }
         }
@@ -811,8 +903,8 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         // Map existing folders by hierarchy key: `${parentId ?? 'root'}::${titleLower}`
         const existingHierarchyMap = new Map<string, FolderItem>();
         for (const item of items) {
-          if (item.type === 'folder') {
-            const key = `${item.folderId ?? 'root'}::${item.title.trim().toLowerCase()}`;
+          if (item.type === "folder") {
+            const key = `${item.folderId ?? "root"}::${item.title.trim().toLowerCase()}`;
             existingHierarchyMap.set(key, item);
           }
         }
@@ -842,35 +934,39 @@ export const useLaunchpadStore = create<LaunchpadState>()(
             parsed.folderPath && parsed.folderPath.length > 0
               ? parsed.folderPath
               : parsed.folderName
-              ? [parsed.folderName]
-              : [];
+                ? [parsed.folderName]
+                : [];
 
           for (let depth = 0; depth < folderPath.length; depth++) {
             const rawTitle = folderPath[depth]?.trim();
             if (!rawTitle) continue;
             const titleLower = rawTitle.toLowerCase();
-            const hierarchyKey: string = `${currentParentId ?? 'root'}::${titleLower}`;
+            const hierarchyKey: string = `${currentParentId ?? "root"}::${titleLower}`;
 
             let resolvedFolderId: string | null = null;
 
             if (activeFolderRegistry.has(hierarchyKey)) {
               resolvedFolderId = activeFolderRegistry.get(hierarchyKey)!.id;
-            } else if (options.mergeFolders && existingHierarchyMap.has(hierarchyKey)) {
+            } else if (
+              options.mergeFolders &&
+              existingHierarchyMap.has(hierarchyKey)
+            ) {
               const existing =
-                modifiedExistingFolders.get(existingHierarchyMap.get(hierarchyKey)!.id) ||
-                existingHierarchyMap.get(hierarchyKey)!;
+                modifiedExistingFolders.get(
+                  existingHierarchyMap.get(hierarchyKey)!.id,
+                ) || existingHierarchyMap.get(hierarchyKey)!;
               resolvedFolderId = existing.id;
               activeFolderRegistry.set(hierarchyKey, existing);
             } else {
               const newFid = `folder-import-${Date.now()}-${folderCounter++}-${Math.random().toString(36).slice(2, 6)}`;
               const newFolderItem: FolderItem = {
                 id: newFid,
-                type: 'folder',
+                type: "folder",
                 title: rawTitle,
-                spaceId: 'space-home',
+                spaceId: "space-home",
                 folderId: currentParentId,
                 itemIds: [],
-                accent: 'blue',
+                accent: "blue",
                 color: DEFAULT_FOLDER_COLOR,
               };
 
@@ -879,7 +975,9 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
               if (currentParentId) {
                 // Link child folder to parent folder's itemIds
-                const parentInNew = newFolders.find((f) => f.id === currentParentId);
+                const parentInNew = newFolders.find(
+                  (f) => f.id === currentParentId,
+                );
                 if (parentInNew) {
                   if (!parentInNew.itemIds.includes(newFid)) {
                     parentInNew.itemIds.push(newFid);
@@ -887,7 +985,9 @@ export const useLaunchpadStore = create<LaunchpadState>()(
                 } else {
                   const parentInExisting =
                     modifiedExistingFolders.get(currentParentId) ||
-                    items.find((f): f is FolderItem => f.id === currentParentId);
+                    items.find(
+                      (f): f is FolderItem => f.id === currentParentId,
+                    );
                   if (parentInExisting) {
                     const updated = {
                       ...parentInExisting,
@@ -909,19 +1009,21 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           const shortcutId = `shortcut-import-${Date.now()}-${shortcutCounter++}-${Math.random().toString(36).slice(2, 6)}`;
           const newShortcut: ShortcutItem = {
             id: shortcutId,
-            type: 'shortcut',
-            title: parsed.title || 'Bookmark',
+            type: "shortcut",
+            title: parsed.title || "Bookmark",
             url: parsed.url,
-            spaceId: 'space-home',
+            spaceId: "space-home",
             folderId: currentParentId,
-            accent: 'violet',
+            accent: "violet",
           };
 
           newShortcuts.push(newShortcut);
           addedUrlsInBatch.add(urlLower);
 
           if (currentParentId) {
-            const folderInNew = newFolders.find((f) => f.id === currentParentId);
+            const folderInNew = newFolders.find(
+              (f) => f.id === currentParentId,
+            );
             if (folderInNew) {
               folderInNew.itemIds.push(shortcutId);
             } else {
@@ -947,11 +1049,13 @@ export const useLaunchpadStore = create<LaunchpadState>()(
             dockIds: currentState.dockIds,
             timestamp: Date.now(),
           });
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.set({ 'tabin-pre-import-snapshot': snapshot }).catch(() => {});
+          if (typeof chrome !== "undefined" && chrome.storage?.local) {
+            chrome.storage.local
+              .set({ "tabin-pre-import-snapshot": snapshot })
+              .catch(() => {});
           }
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('tabin-pre-import-snapshot', snapshot);
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem("tabin-pre-import-snapshot", snapshot);
           }
         } catch {}
 
@@ -959,16 +1063,22 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         const existingIds = new Set(items.map((i) => i.id));
         const safeNewFolders = newFolders.filter((f) => !existingIds.has(f.id));
         safeNewFolders.forEach((f) => existingIds.add(f.id));
-        const safeNewShortcuts = newShortcuts.filter((s) => !existingIds.has(s.id));
+        const safeNewShortcuts = newShortcuts.filter(
+          (s) => !existingIds.has(s.id),
+        );
 
         let updatedItems = items.map((item) => {
-          if (item.type === 'folder' && modifiedExistingFolders.has(item.id)) {
+          if (item.type === "folder" && modifiedExistingFolders.has(item.id)) {
             return modifiedExistingFolders.get(item.id)!;
           }
           return item;
         });
 
-        updatedItems = [...updatedItems, ...safeNewFolders, ...safeNewShortcuts];
+        updatedItems = [
+          ...updatedItems,
+          ...safeNewFolders,
+          ...safeNewShortcuts,
+        ];
 
         const updatedDockIds = [...dockIds];
         for (const rid of newRootDockIds) {
@@ -992,16 +1102,24 @@ export const useLaunchpadStore = create<LaunchpadState>()(
         if (!backup || !Array.isArray(backup.items)) return false;
 
         // 1. Sanitize items
-        const validItems = backup.items.filter((item): item is LaunchpadItem => {
-          if (!item || typeof item !== 'object' || !item.id || typeof item.id !== 'string') return false;
-          if (item.type === 'shortcut') {
-            return typeof (item as ShortcutItem).url === 'string';
-          }
-          if (item.type === 'folder') {
-            return Array.isArray((item as FolderItem).itemIds);
-          }
-          return false;
-        });
+        const validItems = backup.items.filter(
+          (item): item is LaunchpadItem => {
+            if (
+              !item ||
+              typeof item !== "object" ||
+              !item.id ||
+              typeof item.id !== "string"
+            )
+              return false;
+            if (item.type === "shortcut") {
+              return typeof (item as ShortcutItem).url === "string";
+            }
+            if (item.type === "folder") {
+              return Array.isArray((item as FolderItem).itemIds);
+            }
+            return false;
+          },
+        );
 
         if (validItems.length === 0 && backup.items.length > 0) {
           return false;
@@ -1019,10 +1137,12 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
         // 3. Clean dangling child IDs from folders & prevent self-cycles
         const sanitizedItems = deduplicatedItems.map((item) => {
-          if (item.type === 'folder') {
+          if (item.type === "folder") {
             return {
               ...item,
-              itemIds: item.itemIds.filter((cid) => seenIds.has(cid) && cid !== item.id),
+              itemIds: item.itemIds.filter(
+                (cid) => seenIds.has(cid) && cid !== item.id,
+              ),
             };
           }
           return item;
@@ -1030,7 +1150,9 @@ export const useLaunchpadStore = create<LaunchpadState>()(
 
         // 4. Sanitize dockIds to only reference existing items
         const validDockIds = Array.isArray(backup.dockIds)
-          ? backup.dockIds.filter((id): id is string => typeof id === 'string' && seenIds.has(id))
+          ? backup.dockIds.filter(
+              (id): id is string => typeof id === "string" && seenIds.has(id),
+            )
           : undefined;
 
         // 5. Pre-restore safety snapshot of current state
@@ -1043,29 +1165,97 @@ export const useLaunchpadStore = create<LaunchpadState>()(
             wallpaper: currentState.wallpaper,
             timestamp: Date.now(),
           });
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.set({ 'tabin-pre-restore-snapshot': snapshot }).catch(() => {});
+          if (typeof chrome !== "undefined" && chrome.storage?.local) {
+            chrome.storage.local
+              .set({ "tabin-pre-restore-snapshot": snapshot })
+              .catch(() => {});
           }
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('tabin-pre-restore-snapshot', snapshot);
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem("tabin-pre-restore-snapshot", snapshot);
           }
         } catch {}
+
+        if (Array.isArray((backup as any).savedTabGroups)) {
+          if (typeof chrome !== "undefined" && chrome.storage?.local) {
+            chrome.storage.local
+              .set({ "tabin-saved-tabs": (backup as any).savedTabGroups })
+              .catch(() => {});
+          }
+          if (typeof localStorage !== "undefined") {
+            try {
+              localStorage.setItem(
+                "tabin-saved-tabs",
+                JSON.stringify((backup as any).savedTabGroups),
+              );
+            } catch {}
+          }
+        }
+
+        if (Array.isArray((backup as any).notes)) {
+          if (typeof chrome !== "undefined" && chrome.storage?.local) {
+            chrome.storage.local
+              .set({ "tabin-notch-notes": (backup as any).notes })
+              .catch(() => {});
+          }
+          if (typeof localStorage !== "undefined") {
+            try {
+              localStorage.setItem(
+                "tabin-notch-notes",
+                JSON.stringify((backup as any).notes),
+              );
+            } catch {}
+          }
+        }
+
+        if (Array.isArray((backup as any).todos)) {
+          if (typeof chrome !== "undefined" && chrome.storage?.local) {
+            chrome.storage.local
+              .set({ "tabin-notch-todos": (backup as any).todos })
+              .catch(() => {});
+          }
+          if (typeof localStorage !== "undefined") {
+            try {
+              localStorage.setItem(
+                "tabin-notch-todos",
+                JSON.stringify((backup as any).todos),
+              );
+            } catch {}
+          }
+        }
 
         set((state) => ({
           items: sanitizedItems,
           dockIds: validDockIds ?? state.dockIds,
-          settings: backup.settings && typeof backup.settings === 'object'
-            ? { ...state.settings, ...(backup.settings as Partial<LaunchpadSettings>) }
-            : state.settings,
-          wallpaper: backup.wallpaper && typeof backup.wallpaper === 'object'
-            ? { ...state.wallpaper, ...(backup.wallpaper as Partial<WallpaperConfig>) }
-            : state.wallpaper,
+          spaces:
+            Array.isArray((backup as any).spaces) &&
+            (backup as any).spaces.length > 0
+              ? (backup as any).spaces
+              : state.spaces,
+          settings:
+            backup.settings && typeof backup.settings === "object"
+              ? {
+                  ...state.settings,
+                  ...(backup.settings as Partial<LaunchpadSettings>),
+                }
+              : state.settings,
+          wallpaper:
+            backup.wallpaper && typeof backup.wallpaper === "object"
+              ? {
+                  ...state.wallpaper,
+                  ...(backup.wallpaper as Partial<WallpaperConfig>),
+                }
+              : state.wallpaper,
         }));
         return true;
       },
 
       folderOrigin: null,
-      openFolder: (id, origin) => set({ openFolderId: id, folderOrigin: origin ?? null, folderPageIndex: 0 }),
+      openFolder: (id, origin) =>
+        set({
+          openFolderId: id,
+          folderOrigin: origin ?? null,
+          folderPageIndex: 0,
+        }),
       closeFolder: () => set({ openFolderId: null, folderPageIndex: 0 }),
 
       reorderDock: (nextOrder) => set({ dockIds: nextOrder }),
@@ -1073,7 +1263,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       setSearchOpen: (open) =>
         set((state) => ({
           isSearchOpen: open,
-          searchQuery: open ? state.searchQuery : '',
+          searchQuery: open ? state.searchQuery : "",
         })),
       setSearchQuery: (query) => set({ searchQuery: query }),
 
@@ -1104,7 +1294,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           activeShortcutMenuId: null,
           hoveredShortcutId: null,
           isSearchOpen: false,
-          searchQuery: '',
+          searchQuery: "",
           isSettingsOpen: false,
           isAddModalOpen: false,
           dragOverFolderId: null,
@@ -1115,7 +1305,7 @@ export const useLaunchpadStore = create<LaunchpadState>()(
       },
     }),
     {
-      name: 'launchpad-storage',
+      name: "launchpad-storage",
       storage: createJSONStorage(() => dualStorageAdapter),
       partialize: (state) => ({
         spaces: state.spaces,
@@ -1155,12 +1345,21 @@ export const useLaunchpadStore = create<LaunchpadState>()(
           if (state.wallpaper.darkness === undefined) {
             state.wallpaper.darkness = DEFAULT_WALLPAPER_CONFIG.darkness;
           }
-          if (state.wallpaper.type === 'preset' && state.wallpaper.presetId !== 'sonoma') {
-            state.wallpaper.presetId = 'sonoma';
+          if (
+            state.wallpaper.type === "preset" &&
+            state.wallpaper.presetId !== "sonoma"
+          ) {
+            state.wallpaper.presetId = "sonoma";
           }
         }
-        if (state?.settings?.spacesEnabled && state.settings.defaultSpaceId && state.spaces) {
-          const defaultIndex = state.spaces.findIndex((s) => s.id === state.settings.defaultSpaceId);
+        if (
+          state?.settings?.spacesEnabled &&
+          state.settings.defaultSpaceId &&
+          state.spaces
+        ) {
+          const defaultIndex = state.spaces.findIndex(
+            (s) => s.id === state.settings.defaultSpaceId,
+          );
           if (defaultIndex !== -1) {
             state.activeSpaceIndex = defaultIndex;
           }
@@ -1175,27 +1374,35 @@ export const useLaunchpadStore = create<LaunchpadState>()(
  */
 export function syncStoreFromExternal(data: unknown) {
   if (!data) return;
-  const rawString = typeof data === 'string' ? data : JSON.stringify(data);
+  const rawString = typeof data === "string" ? data : JSON.stringify(data);
   if (lastWrittenStorageString && rawString === lastWrittenStorageString) {
     return;
   }
   try {
-    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-    const incomingState = (parsed as { state?: Partial<LaunchpadState> })?.state || (parsed as Partial<LaunchpadState>);
+    const parsed = typeof data === "string" ? JSON.parse(data) : data;
+    const incomingState =
+      (parsed as { state?: Partial<LaunchpadState> })?.state ||
+      (parsed as Partial<LaunchpadState>);
     if (incomingState && Array.isArray(incomingState.items)) {
       const items = migrateLegacyItems(incomingState.items);
-      const dockIds = incomingState.dockIds ? migrateLegacyDockIds(incomingState.dockIds) : undefined;
+      const dockIds = incomingState.dockIds
+        ? migrateLegacyDockIds(incomingState.dockIds)
+        : undefined;
       useLaunchpadStore.setState((current) => ({
         ...current,
         items: items ?? current.items,
         dockIds: dockIds ?? current.dockIds,
         spaces: incomingState.spaces ?? current.spaces,
-        settings: incomingState.settings ? { ...current.settings, ...incomingState.settings } : current.settings,
-        wallpaper: incomingState.wallpaper ? { ...current.wallpaper, ...incomingState.wallpaper } : current.wallpaper,
+        settings: incomingState.settings
+          ? { ...current.settings, ...incomingState.settings }
+          : current.settings,
+        wallpaper: incomingState.wallpaper
+          ? { ...current.wallpaper, ...incomingState.wallpaper }
+          : current.wallpaper,
       }));
     }
   } catch (err) {
-    console.warn('Failed to sync Tabin store from external update:', err);
+    console.warn("Failed to sync Tabin store from external update:", err);
   }
 }
 
@@ -1203,20 +1410,29 @@ export function syncStoreFromExternal(data: unknown) {
 
 /** Top-level items (shortcuts + folders) belonging to a given space. */
 export function selectSpaceItems(items: LaunchpadItem[], spaceId: string) {
-  return items.filter((item) => item.folderId === null && item.spaceId === spaceId);
+  return items.filter(
+    (item) => item.folderId === null && item.spaceId === spaceId,
+  );
 }
 
 /** Resolved child shortcuts for an open folder, in stored order. */
-export function selectFolderChildren(items: LaunchpadItem[], folder: FolderItem) {
+export function selectFolderChildren(
+  items: LaunchpadItem[],
+  folder: FolderItem,
+) {
   return folder.itemIds
     .map((id) => items.find((item) => item.id === id))
     .filter((item): item is LaunchpadItem => Boolean(item));
 }
 
 /** Resolved dock folders, in stored order. Falls back to all available folders if dockIds has no folders. */
-export function selectDockFolders(items: LaunchpadItem[], dockIds: string[]): FolderItem[] {
+export function selectDockFolders(
+  items: LaunchpadItem[],
+  dockIds: string[],
+): FolderItem[] {
   const rootFolders = items.filter(
-    (item): item is FolderItem => item.type === 'folder' && item.folderId === null,
+    (item): item is FolderItem =>
+      item.type === "folder" && item.folderId === null,
   );
   const folderMap = new Map(rootFolders.map((f) => [f.id, f]));
   const ordered = dockIds
@@ -1229,14 +1445,18 @@ export function selectDockFolders(items: LaunchpadItem[], dockIds: string[]): Fo
 }
 
 /** Resolved dock items, in stored order. */
-export function selectDockItems(items: LaunchpadItem[], dockIds: string[]): FolderItem[] {
+export function selectDockItems(
+  items: LaunchpadItem[],
+  dockIds: string[],
+): FolderItem[] {
   return selectDockFolders(items, dockIds);
 }
 
 /** Every shortcut across every space + folder, for global search. */
 export function selectAllShortcuts(items: LaunchpadItem[]) {
-  return items.filter((item): item is Extract<LaunchpadItem, { type: 'shortcut' }> =>
-    item.type === 'shortcut',
+  return items.filter(
+    (item): item is Extract<LaunchpadItem, { type: "shortcut" }> =>
+      item.type === "shortcut",
   );
 }
 
@@ -1248,21 +1468,21 @@ export function selectSearchableItems(
   if (!spaceId) {
     return items.filter(
       (item): item is ShortcutItem | FolderItem =>
-        item.type === 'shortcut' || item.type === 'folder',
+        item.type === "shortcut" || item.type === "folder",
     );
   }
 
   const folderSpaceMap = new Map<string, string>();
   for (const item of items) {
-    if (item.type === 'folder') {
-      folderSpaceMap.set(item.id, item.spaceId || 'space-home');
+    if (item.type === "folder") {
+      folderSpaceMap.set(item.id, item.spaceId || "space-home");
     }
   }
 
   return items.filter((item): item is ShortcutItem | FolderItem => {
-    if (item.type !== 'shortcut' && item.type !== 'folder') return false;
+    if (item.type !== "shortcut" && item.type !== "folder") return false;
 
-    const itemSpaceId = item.spaceId || 'space-home';
+    const itemSpaceId = item.spaceId || "space-home";
     const effectiveSpaceId = item.folderId
       ? (folderSpaceMap.get(item.folderId) ?? itemSpaceId)
       : itemSpaceId;
@@ -1270,4 +1490,3 @@ export function selectSearchableItems(
     return effectiveSpaceId === spaceId;
   });
 }
-

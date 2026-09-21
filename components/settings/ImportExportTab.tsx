@@ -1,6 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useLaunchpadStore } from '@/store/useLaunchpadStore';
+import {
+  getAutoBackupStatus,
+  subscribeAutoBackupStatus,
+  markBackupRestored,
+  pickAndConnectBackupFile,
+  reconnectBackupFile,
+  performManualBackup,
+  type AutoBackupStatus,
+} from '@/lib/autoBackup';
 import { processImportSource, type ParsedImportResult } from '@/lib/bookmarkParser';
 import {
   exportToHtml,
@@ -201,6 +210,91 @@ export function ImportExportTab() {
   const [isChromeLoading, setIsChromeLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [backupStatus, setBackupStatus] = useState<AutoBackupStatus | null>(null);
+  const [isBackupActionRunning, setIsBackupActionRunning] = useState(false);
+
+  const refreshBackupStatus = async () => {
+    try {
+      const status = await getAutoBackupStatus();
+      setBackupStatus(status);
+    } catch {}
+  };
+
+  useEffect(() => {
+    return subscribeAutoBackupStatus((status) => {
+      setBackupStatus(status);
+    });
+  }, []);
+
+  const formatBackupTime = (timestamp: number | null): string => {
+    if (!timestamp) return 'Never';
+    const diffSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const date = new Date(timestamp);
+    return (
+      date.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+      ' at ' +
+      date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    );
+  };
+
+  const handleChooseBackupFile = async () => {
+    setIsBackupActionRunning(true);
+    try {
+      const result = await pickAndConnectBackupFile();
+      await refreshBackupStatus();
+      if (result.success) {
+        showToast(true, `Connected & backed up to ${result.fileName}`);
+      } else if (result.error && result.error !== 'File selection was cancelled.') {
+        showToast(false, result.error);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(false, `File selection error: ${msg}`);
+    } finally {
+      setIsBackupActionRunning(false);
+    }
+  };
+
+  const handleReconnect = async () => {
+    setIsBackupActionRunning(true);
+    try {
+      const granted = await reconnectBackupFile();
+      await refreshBackupStatus();
+      if (granted) {
+        showToast(true, 'Backup file reconnected successfully.');
+      } else {
+        showToast(false, 'Permission was not granted.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(false, `Reconnect error: ${msg}`);
+    } finally {
+      setIsBackupActionRunning(false);
+    }
+  };
+
+  const handleManualBackupNow = async () => {
+    setIsBackupActionRunning(true);
+    try {
+      const result = await performManualBackup();
+      await refreshBackupStatus();
+      if (result.success) {
+        showToast(true, `Backup saved to ${result.fileName || 'file'}`);
+      } else {
+        showToast(false, result.error || 'Backup operation failed.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(false, `Backup error: ${msg}`);
+    } finally {
+      setIsBackupActionRunning(false);
+    }
+  };
 
   const showToast = (ok: boolean, msg: string) => {
     setToast({ ok, msg });
@@ -277,6 +371,7 @@ export function ImportExportTab() {
       if (confirmState.isBackup && confirmState.parseResult.rawTabinBackup) {
         const success = restoreBackup(confirmState.parseResult.rawTabinBackup as any);
         if (success) {
+          markBackupRestored(confirmState.parseResult.rawTabinBackup as any);
           const count = confirmState.parseResult.rawTabinBackup.items.length;
           showToast(true, `Workspace restored — ${count} items.`);
         } else {
@@ -325,7 +420,7 @@ export function ImportExportTab() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className={`mb-5 inline-flex w-fit max-w-[calc(100%-2.5rem)] items-center gap-2 rounded-lg px-3 py-2.5 text-[11.5px] font-medium leading-none ${
+            className={`mb-3 inline-flex w-fit max-w-[calc(100%-2.5rem)] items-center gap-2 rounded-lg px-3 py-2 text-[11.5px] font-medium leading-none ${
               toast.ok
                 ? 'bg-emerald-500/10 text-emerald-300'
                 : 'bg-red-500/[0.09] text-red-300/90'
@@ -347,8 +442,8 @@ export function ImportExportTab() {
       />
 
       {/* ── Import ────────────────────────────────── */}
-      <section className="mb-6">
-        <p className="mb-2.5 text-[11px] font-medium text-white/50">Import</p>
+      <section className="mb-3.5">
+        <p className="mb-2 text-[11px] font-medium text-white/50">Import</p>
 
         <AnimatePresence mode="wait">
           {confirmState ? (
@@ -359,10 +454,10 @@ export function ImportExportTab() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18 }}
-              className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
+              className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5"
             >
               {/* Source */}
-              <div className="flex items-center gap-2 mb-3.5">
+              <div className="flex items-center gap-2 mb-2.5">
                 <TabinIcon
                   name={confirmState.source === 'chrome' ? 'chrome' : 'import'}
                   size={15}
@@ -376,19 +471,19 @@ export function ImportExportTab() {
               {/* Stats */}
               <div className="flex items-end gap-6 mb-1">
                 <div>
-                  <span className="block text-[26px] font-semibold tracking-tight leading-none text-white">
+                  <span className="block text-[24px] font-semibold tracking-tight leading-none text-white">
                     {confirmState.isBackup ? (confirmState.parseResult.rawTabinBackup?.items.length ?? 0) : newCount}
                   </span>
-                  <span className="text-[10.5px] text-white/35 mt-1 block">
+                  <span className="text-[10px] text-white/35 mt-1 block">
                     {confirmState.isBackup ? 'items' : 'new bookmarks'}
                   </span>
                 </div>
                 {!confirmState.isBackup && confirmState.folderCount > 0 && (
                   <div>
-                    <span className="block text-[26px] font-semibold tracking-tight leading-none text-white/55">
+                    <span className="block text-[24px] font-semibold tracking-tight leading-none text-white/55">
                       {confirmState.folderCount}
                     </span>
-                    <span className="text-[10.5px] text-white/35 mt-1 block">
+                    <span className="text-[10px] text-white/35 mt-1 block">
                       folder{confirmState.folderCount === 1 ? '' : 's'}
                     </span>
                   </div>
@@ -396,17 +491,17 @@ export function ImportExportTab() {
               </div>
 
               {/* Notes */}
-              <div className="mt-3 mb-4 space-y-1">
+              <div className="mt-2 mb-3 space-y-0.5">
                 {confirmState.folderCount > 0 && !confirmState.isBackup && (
-                  <p className="text-[11px] text-white/35">Folder structure will be preserved.</p>
+                  <p className="text-[10.5px] text-white/35">Folder structure will be preserved.</p>
                 )}
                 {confirmState.duplicateCount > 0 && !confirmState.isBackup && (
-                  <p className="text-[11px] text-white/25">
+                  <p className="text-[10.5px] text-white/25">
                     {confirmState.duplicateCount} duplicate{confirmState.duplicateCount === 1 ? '' : 's'} will be skipped.
                   </p>
                 )}
                 {confirmState.isBackup && (
-                  <p className="text-[11px] text-amber-300/50">Replaces your current workspace.</p>
+                  <p className="text-[10.5px] text-amber-300/50">Replaces your current workspace.</p>
                 )}
               </div>
 
@@ -416,28 +511,28 @@ export function ImportExportTab() {
                   type="button"
                   onClick={handleConfirm}
                   disabled={isImporting || (!confirmState.isBackup && newCount === 0)}
-                  className="rounded-lg bg-[#FA1E76] px-3.5 py-1.5 text-[12px] font-medium text-white shadow-[0_2px_12px_rgba(250,30,118,0.3)] hover:bg-[#ff3086] active:bg-[#e01666] disabled:opacity-35 disabled:cursor-not-allowed disabled:shadow-none transition-all cursor-pointer"
+                  className="rounded-lg bg-[#FA1E76] px-3 py-1.5 text-[11.5px] font-medium text-white shadow-[0_2px_12px_rgba(250,30,118,0.3)] hover:bg-[#ff3086] active:bg-[#e01666] disabled:opacity-35 disabled:cursor-not-allowed disabled:shadow-none transition-all cursor-pointer"
                 >
                   {isImporting ? 'Importing…' : confirmState.isBackup ? 'Restore workspace' : 'Add to Tabin'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmState(null)}
-                  className="rounded-lg px-2.5 py-1.5 text-[12px] text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                  className="rounded-lg px-2.5 py-1.5 text-[11.5px] text-white/50 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
               </div>
             </motion.div>
           ) : (
-            /* Import sources */
+            /* Import sources in a 2-column grid */
             <motion.div
               key="sources"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.14 }}
-              className="space-y-1.5"
+              className="grid grid-cols-2 gap-2.5"
             >
               {/* File drop zone */}
               <div
@@ -445,19 +540,20 @@ export function ImportExportTab() {
                 onDragLeave={() => setIsDragOver(false)}
                 onDrop={(e) => { e.preventDefault(); setIsDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) parseFile(f); }}
                 onClick={() => fileInputRef.current?.click()}
-                className={`group flex items-center gap-3 rounded-xl px-4 py-3 cursor-pointer transition-all duration-150 ${
+                title="HTML · JSON · CSV · TXT - format detected automatically"
+                className={`group flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 cursor-pointer transition-all duration-150 ${
                   isDragOver
                     ? 'bg-white/[0.06] border border-white/[0.12]'
                     : 'bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.045] hover:border-white/[0.1]'
                 }`}
               >
-                <TabinIcon name="import" size={18} className="shrink-0 text-white/45 group-hover:text-white/80 transition-colors" />
+                <TabinIcon name="import" size={17} className="shrink-0 text-white/45 group-hover:text-white/80 transition-colors" />
                 <div className="flex-1 min-w-0">
-                  <span className="block text-[12px] font-medium text-white/70 group-hover:text-white/90 transition-colors">
+                  <span className="block text-[12px] font-medium text-white/70 group-hover:text-white/90 transition-colors truncate">
                     {isDragOver ? 'Drop to import' : 'Open bookmark file'}
                   </span>
-                  <span className="text-[10.5px] text-white/28 mt-0.5 block">
-                    HTML · JSON · CSV · TXT - format detected automatically
+                  <span className="text-[10px] text-white/30 mt-0.5 block truncate">
+                    HTML · JSON · CSV · TXT
                   </span>
                 </div>
               </div>
@@ -467,22 +563,25 @@ export function ImportExportTab() {
                 type="button"
                 onClick={handleImportFromChrome}
                 disabled={isChromeLoading}
-                className="group w-full flex items-center gap-3 rounded-xl px-4 py-3 bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.045] hover:border-white/[0.1] transition-all cursor-pointer disabled:opacity-40"
+                title="Syncs bookmarks and folders with permission"
+                className="group flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.045] hover:border-white/[0.1] transition-all cursor-pointer disabled:opacity-40 text-left"
               >
-                <TabinIcon name="chrome" size={18} className="shrink-0 text-white/45 group-hover:text-white/80 transition-colors" />
-                <div className="flex-1 text-left min-w-0">
-                  <span className="block text-[12px] font-medium text-white/65 group-hover:text-white/85 transition-colors">
-                    Import from Chrome
-                  </span>
-                  <span className="text-[10.5px] text-white/28 mt-0.5 block">
-                    Syncs bookmarks and folders with permission
+                <TabinIcon name="chrome" size={17} className="shrink-0 text-white/45 group-hover:text-white/80 transition-colors" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="block text-[12px] font-medium text-white/65 group-hover:text-white/85 transition-colors truncate">
+                      Import from Chrome
+                    </span>
+                    {isChromeLoading && (
+                      <span className="shrink-0 text-[10px] text-white/40">
+                        Loading…
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-white/30 mt-0.5 block truncate">
+                    Syncs bookmarks & folders
                   </span>
                 </div>
-                {isChromeLoading && (
-                  <span className="shrink-0 text-[10.5px] text-white/40">
-                    Loading…
-                  </span>
-                )}
               </button>
             </motion.div>
           )}
@@ -490,11 +589,134 @@ export function ImportExportTab() {
       </section>
 
       {/* Divider */}
-      <div className="border-t border-white/[0.06] mb-6" />
+      <div className="border-t border-white/[0.06] mb-3.5" />
+
+      {/* ── Automatic Backup ──────────────────────── */}
+      <section className="mb-3.5">
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="text-[11px] font-medium text-white/50">Automatic Backup</p>
+          <div className="flex items-center gap-1.5 text-[10.5px]">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                !backupStatus?.isSupported
+                  ? 'bg-white/30'
+                  : backupStatus?.isWritable
+                  ? 'bg-emerald-400'
+                  : backupStatus?.needsReconnect
+                  ? 'bg-amber-400'
+                  : backupStatus?.lastError || (backupStatus?.hasFile && !backupStatus?.isWritable)
+                  ? 'bg-rose-400'
+                  : 'bg-white/30'
+              }`}
+            />
+            <span
+              className={
+                !backupStatus?.isSupported
+                  ? 'text-white/40'
+                  : backupStatus?.isWritable
+                  ? 'text-emerald-300/90 font-medium'
+                  : backupStatus?.needsReconnect
+                  ? 'text-amber-300/90 font-medium'
+                  : backupStatus?.lastError || (backupStatus?.hasFile && !backupStatus?.isWritable)
+                  ? 'text-rose-300/90 font-medium'
+                  : 'text-white/40'
+              }
+            >
+              {!backupStatus?.isSupported
+                ? 'Unsupported'
+                : backupStatus?.isWritable
+                ? 'Active'
+                : backupStatus?.needsReconnect
+                ? 'Needs Reconnect'
+                : backupStatus?.lastError || (backupStatus?.hasFile && !backupStatus?.isWritable)
+                ? 'Error'
+                : 'Not Configured'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.015] px-3.5 py-2.5">
+          <div className="flex-1 min-w-0">
+            <span className="block text-[12px] font-medium text-white/75 leading-tight truncate">
+              {backupStatus?.hasFile
+                ? backupStatus.fileName
+                : 'No backup file selected'}
+            </span>
+            <span
+              title={backupStatus?.lastError || undefined}
+              className="text-[10.5px] text-white/35 mt-0.5 block truncate"
+            >
+              {!backupStatus?.isSupported
+                ? 'File System Access API is not supported in this browser'
+                : backupStatus?.lastError && !backupStatus?.isWritable
+                ? backupStatus.lastError
+                : backupStatus?.hasFile
+                ? backupStatus.needsReconnect
+                  ? 'Permission expired — click Reconnect to resume auto-backups'
+                  : `Last backed up: ${formatBackupTime(backupStatus.lastBackupTime)}`
+                : 'Choose a location (e.g. Downloads/Tabin/tabin-backup.json)'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {backupStatus?.isWritable ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleManualBackupNow}
+                  disabled={isBackupActionRunning}
+                  className="rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white px-2.5 py-1.5 text-[11px] font-medium transition-all cursor-pointer disabled:opacity-40"
+                >
+                  {isBackupActionRunning ? 'Backing up…' : 'Back up now'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleChooseBackupFile}
+                  disabled={isBackupActionRunning}
+                  className="rounded-lg bg-white/[0.04] hover:bg-white/[0.09] text-white/50 hover:text-white px-2.5 py-1.5 text-[11px] font-medium transition-all cursor-pointer disabled:opacity-40"
+                >
+                  Change file
+                </button>
+              </>
+            ) : backupStatus?.needsReconnect ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleReconnect}
+                  disabled={isBackupActionRunning}
+                  className="rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2.5 py-1.5 text-[11px] font-medium transition-all cursor-pointer disabled:opacity-40"
+                >
+                  {isBackupActionRunning ? 'Reconnecting…' : 'Reconnect'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleChooseBackupFile}
+                  disabled={isBackupActionRunning}
+                  className="rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-white/70 hover:text-white px-2.5 py-1.5 text-[11px] font-medium transition-all cursor-pointer disabled:opacity-40"
+                >
+                  Change file
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleChooseBackupFile}
+                disabled={isBackupActionRunning}
+                className="rounded-lg bg-[#FA1E76] hover:bg-[#ff3086] active:bg-[#e01666] text-white px-3 py-1.5 text-[11px] font-medium shadow-[0_2px_10px_rgba(250,30,118,0.25)] transition-all cursor-pointer disabled:opacity-40"
+              >
+                {isBackupActionRunning ? 'Connecting…' : 'Choose backup file'}
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Divider */}
+      <div className="border-t border-white/[0.06] mb-3.5" />
 
       {/* ── Export ────────────────────────────────── */}
       <section>
-        <div className="flex items-baseline justify-between mb-2.5">
+        <div className="flex items-baseline justify-between mb-2">
           <p className="text-[11px] font-medium text-white/50">Export</p>
           <span className="text-[10.5px] text-white/25">
             {shortcutCount} bookmark{shortcutCount === 1 ? '' : 's'}
@@ -502,24 +724,28 @@ export function ImportExportTab() {
           </span>
         </div>
 
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] overflow-hidden divide-y divide-white/[0.04]">
+        <div className="grid grid-cols-2 gap-2">
           {EXPORT_FORMATS.map((fmt) => (
             <button
               key={fmt.id}
               type="button"
               onClick={() => handleExport(fmt.id)}
-              className="group w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.035] active:bg-white/[0.06] transition-colors cursor-pointer"
+              className="group flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.015] px-3 py-2 text-left hover:bg-white/[0.04] hover:border-white/[0.1] active:bg-white/[0.06] transition-all cursor-pointer"
             >
-              <TabinIcon name={fmt.id} size={17} className="shrink-0 text-white/40 group-hover:text-white/80 transition-colors" />
+              <TabinIcon name={fmt.id} size={16} className="shrink-0 text-white/40 group-hover:text-white/80 transition-colors" />
               <div className="flex-1 min-w-0">
-                <span className="block text-[12px] font-medium text-white/70 group-hover:text-white/90 transition-colors leading-tight">
-                  {fmt.label}
+                <div className="flex items-center justify-between gap-1.5">
+                  <span className="text-[12px] font-medium text-white/70 group-hover:text-white/90 transition-colors truncate">
+                    {fmt.label}
+                  </span>
+                  <span className="shrink-0 font-mono text-[9px] text-white/20 group-hover:text-white/40 transition-colors bg-white/[0.04] rounded px-1.5 py-0.5 group-hover:bg-white/[0.08]">
+                    .{fmt.ext}
+                  </span>
+                </div>
+                <span className="text-[10px] text-white/28 block truncate mt-0.5">
+                  {fmt.note}
                 </span>
-                <span className="text-[10.5px] text-white/28 leading-tight">{fmt.note}</span>
               </div>
-              <span className="shrink-0 font-mono text-[9.5px] text-white/20 group-hover:text-white/40 transition-colors bg-white/[0.04] rounded px-1.5 py-0.5 group-hover:bg-white/[0.08]">
-                .{fmt.ext}
-              </span>
             </button>
           ))}
         </div>
