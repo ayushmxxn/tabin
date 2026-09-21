@@ -175,3 +175,14 @@ export const ACCENT_CLASSES: Record<
 export function clampPosition(value: number, max: number): number {
   return Math.min(Math.max(value, 0), Math.max(max, 0));
 }
+
+let globalLastDragEndTime = 0;
+
+export function recordGlobalDragEnd() {
+  globalLastDragEndTime = Date.now();
+}
+
+export function isRecentDrag(thresholdMs = 600): boolean {
+  return Date.now() - globalLastDragEndTime < thresholdMs;
+}
+

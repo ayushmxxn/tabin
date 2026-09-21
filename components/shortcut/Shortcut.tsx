@@ -4,7 +4,7 @@ import { Tile, clearFailedFaviconUrl } from './Tile';
 import { ShortcutEmbedTile, clearFailedImageUrl } from './ShortcutEmbedTile';
 import { useCanvasDrag } from '@/hooks/useCanvasDrag';
 import { useLaunchpadStore } from '@/store/useLaunchpadStore';
-import { cn, getHostname, openShortcutUrl } from '@/lib/utils';
+import { cn, getHostname, openShortcutUrl, isRecentDrag } from '@/lib/utils';
 import { fetchWebsiteMetadata } from '@/lib/fetchMetadata';
 import type { ShortcutItem } from '@/types';
 
@@ -216,10 +216,16 @@ export const Shortcut = memo(function Shortcut({
   const isNearRight = position.x > 0.82;
   const isNearLeft = position.x < 0.18;
 
+  const anchorPosRef = useRef(position);
+  if (!isDragging) {
+    anchorPosRef.current = position;
+  }
+  const effectivePos = isDragging ? anchorPosRef.current : position;
+
   return (
     <motion.div
       ref={containerRef}
-      layout
+      layout={!isDragging}
       onMouseEnter={() => setHoveredShortcutId(item.id)}
       onMouseLeave={() => {
         if (isHovered) {
@@ -229,27 +235,29 @@ export const Shortcut = memo(function Shortcut({
       }}
       className={cn(
         "absolute -translate-x-1/2 -translate-y-1/2",
-        isMenuOpen ? "z-50" : "z-0"
+        isDragging ? "z-50" : isMenuOpen ? "z-50" : "z-0"
       )}
       style={{
-        left: `${position.x * 100}%`,
-        top: `${position.y * 100}%`,
-        zIndex: isMenuOpen ? 50 : undefined,
+        left: `${effectivePos.x * 100}%`,
+        top: `${effectivePos.y * 100}%`,
+        zIndex: isDragging ? 60 : isMenuOpen ? 50 : undefined,
       }}
       initial={
-        isFolderView
-          ? {
-              x: deltaX,
-              y: deltaY,
-              scale: 0.12,
-              opacity: 0,
-            }
-          : {
-              x: 0,
-              y: 0,
-              scale: 0.95,
-              opacity: 0,
-            }
+        isDragging
+          ? false
+          : isFolderView
+            ? {
+                x: deltaX,
+                y: deltaY,
+                scale: 0.12,
+                opacity: 0,
+              }
+            : {
+                x: 0,
+                y: 0,
+                scale: 0.95,
+                opacity: 0,
+              }
       }
       animate={{
         x: 0,
@@ -410,7 +418,7 @@ export const Shortcut = memo(function Shortcut({
           setIsPressed(false);
           clearLongPressTimer();
         }}
-        onClick={() => {
+        onClick={(e) => {
           if (isLongPressTriggeredRef.current) {
             isLongPressTriggeredRef.current = false;
             return;
@@ -420,6 +428,11 @@ export const Shortcut = memo(function Shortcut({
           }
           if (isMenuOpen) {
             setActiveShortcutMenuId(null);
+            return;
+          }
+          if (isRecentDrag(600)) {
+            e.preventDefault();
+            e.stopPropagation();
             return;
           }
           handleActivate();

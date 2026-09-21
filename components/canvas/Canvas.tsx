@@ -359,7 +359,7 @@ export function Canvas() {
 
   const destinationKey = activeFolder
     ? `folder-${activeFolder.id}-page-${safePageIndex}`
-    : `space-${spacesEnabled ? activeSpace.id : 'all'}-screen-${safePageIndex}`;
+    : `space-${spacesEnabled ? activeSpace.id : "all"}-screen-${safePageIndex}`;
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (ctxMenu) {
@@ -445,6 +445,7 @@ export function Canvas() {
                   <button
                     type="button"
                     data-folder-item
+                    data-folder-id={item.id}
                     onClick={() => openFolder(item.id)}
                     onContextMenu={(e) => e.stopPropagation()}
                     className="flex w-16 flex-col items-center gap-1.5 cursor-pointer"

@@ -1,5 +1,5 @@
 import { DEFAULT_FOLDER_COLOR } from "@/lib/folderColors";
-import { cn } from "@/lib/utils";
+import { cn, isRecentDrag } from "@/lib/utils";
 import {
   selectDockFolders,
   selectFolderChildren,
@@ -474,13 +474,14 @@ const DockFolderItem = memo(function DockFolderItem({
       {/* Main Folder Item Button */}
       <motion.div
         ref={folderButtonRef}
+        data-dock-folder-id={folder.id}
         role="button"
         tabIndex={0}
         aria-label={`Open folder ${folder.title}`}
         aria-current={isActive ? "page" : undefined}
         whileTap={{ scale: 0.94 }}
         whileHover={
-          dockMagnification
+          dockMagnification && !isDragOver
             ? {
                 scale: 1.18,
                 y: -4,
@@ -531,6 +532,11 @@ const DockFolderItem = memo(function DockFolderItem({
             e.stopPropagation();
             return;
           }
+          if (isRecentDrag(600)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
           handleClick();
         }}
         onKeyDown={(e) => {
@@ -567,7 +573,7 @@ const DockFolderItem = memo(function DockFolderItem({
             size="sm"
             items={folderChildren}
             isHovered={isHovered || isDragOver}
-            isOpen={isActive}
+            isOpen={isActive || isDragOver}
           />
         </div>
       </motion.div>
@@ -603,6 +609,9 @@ export function Dock() {
   }, [items, dockIds, spacesEnabled, activeSpace.id]);
 
   const isHomeActive = openFolderId === null;
+  const isHomeDragOver = useLaunchpadStore(
+    (state) => state.dragOverFolderId === "home",
+  );
   const [isHomeHovered, setIsHomeHovered] = useState(false);
   const [isAddHovered, setIsAddHovered] = useState(false);
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
@@ -662,7 +671,14 @@ export function Dock() {
             type="button"
             data-dock-home="true"
             whileTap={{ scale: 0.94 }}
-            onClick={() => closeFolder()}
+            onClick={(e) => {
+              if (isRecentDrag(600)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+              }
+              closeFolder();
+            }}
             aria-label="Home Screen"
             aria-current={isHomeActive ? "page" : undefined}
             className={cn(
