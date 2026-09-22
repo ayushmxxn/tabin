@@ -2,7 +2,7 @@
   "name": "tabin",
   "description": "Turn your New Tab into a visual home for your favorite websites.",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",

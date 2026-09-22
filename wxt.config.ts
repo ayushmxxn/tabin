@@ -12,7 +12,7 @@ export default defineConfig({
     name: "Tabin",
     description:
       "Turn your New Tab into a visual home for your favorite websites.",
-    version: "0.1.0",
+    version: "1.0.0",
     icons: {
       "16": "icon-16.png",
       "32": "icon-32.png",
