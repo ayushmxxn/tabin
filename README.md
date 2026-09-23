@@ -4,10 +4,10 @@
   <p>Turn your New Tab into a visual home for your favorite websites.</p>
 
   <p>
-    <a href="#key-features"><strong>Features</strong></a> •
+    <a href="#features"><strong>Features</strong></a> •
     <a href="#installation"><strong>Installation</strong></a> •
-    <a href="#development--local-setup"><strong>Development</strong></a> •
-    <a href="#privacy--local-first"><strong>Privacy</strong></a> •
+    <a href="#development"><strong>Development</strong></a> •
+    <a href="#privacy"><strong>Privacy</strong></a> •
     <a href="https://x.com/ayushmxxn"><strong>Twitter / X</strong></a>
   </p>
 
@@ -20,72 +20,82 @@
 
 ## Overview
 
-**Tabin** is a fast, local-first Chrome extension that transforms your browser's New Tab page into an elegant, organized launchpad. Designed with a clean aesthetic and fluid micro-interactions, Tabin lets you curate your favorite web destinations, organize workspaces into Spaces and Folders, keep instant scratchpad notes, and manage tab sessions—all while keeping 100% of your data on your machine.
+Most new tab pages are either crowded with sponsored links and news feeds, or left completely blank. Bookmarks bars get cluttered quickly, and keeping dozens of tabs open just to save links for later eats up memory and adds mental noise.
+
+**Tabin** is a fast, local-first extension that turns your browser's New Tab page into a clean, visual home for the sites you visit most.
+
+Instead of digging through nested menus or hoarding tabs, Tabin gives you an organized dashboard where you can arrange links into spaces and folders, stash active tabs to free up memory, and jot down quick notes without leaving the page.
+
+Everything runs directly on your device. There are no accounts, no cloud servers, and zero tracking. Your shortcuts, notes, and browsing sessions stay on your machine.
 
 ---
 
-## Key Features
+## Features
 
-- **Visual Launchpad:** Clean icon grid with dynamic accent colors, smooth layout transitions powered by Motion, customizable columns, and paginated navigation.
-- **Spaces & Folders:** Group your bookmarks into separate workspaces (such as *Home*, *Work*, and *Personal*) and create nested folders with live preview stacks and popover overlays.
-- **Interactive Dock:** Pinned favorites and folders along the bottom dock for one-click access across spaces.
-- **Saved Tabs & Session Restore:** Capture active browser tabs and tab groups to free up memory, then restore individual tabs or whole sessions whenever you need them.
-- **Quick Notes Notch:** A subtle top-left dynamic notch for frictionless, distraction-free scratchpad notes.
-- **Instant Search:** Press `/` anywhere on the new tab to search and filter your shortcuts and folders locally with zero network latency.
-- **One-Click Tab Capture:** Right-click any web page or tab to save it directly to Tabin or into a specific folder via the context menu.
-- **Smart Metadata Resolution:** Automatically fetches high-resolution site favicons and OpenGraph preview images with background caching.
-- **Custom Wallpapers:** Choose from bundled high-definition scenery presets, upload custom image wallpapers, or set live video backgrounds.
-- **Import & Export:** Seamlessly import existing browser bookmarks (HTML) and export your entire workspace configuration as JSON.
+- **Visual Grid:** A clean shortcut grid with customizable columns and pagination.
+- **Spaces & Folders:** Group links into dedicated workspaces (like Work, Personal, or Projects) and organize related sites into folders.
+- **Quick Dock:** Pin your everyday sites and folders to a bottom dock for one-click access across spaces.
+- **Saved Tabs & Sessions:** Save active tabs and tab groups to clear your browser window, then restore them individually or all at once.
+- **Quick Notes:** A quiet scratchpad in the corner for jotting down thoughts, reminders, or temporary links.
+- **Instant Search:** Press `/` anywhere on the new tab to filter through your shortcuts and folders instantly.
+- **Right-Click Capture:** Save any open page directly to Tabin or straight into a folder using the browser context menu.
+- **Automatic Metadata:** Automatically pulls high-resolution icons and site previews for your saved links.
+- **Custom Backgrounds:** Choose from curated wallpapers, upload your own images, or set a subtle video background.
+- **Import & Export:** Bring in your existing browser bookmarks (HTML) or export your entire setup as JSON.
 
 ---
 
 ## Installation
 
-### Load Unpacked (Chrome / Edge / Brave / Arc)
+### Load Unpacked (Chrome, Edge, Brave, Arc)
 
-1. Download or clone this repository:
+1. Clone or download the repository:
    ```bash
    git clone https://github.com/ayushmxxn/tabin.git
    cd tabin
    ```
+
 2. Install dependencies and build the extension:
    ```bash
    pnpm install
    pnpm build
    ```
-3. Open your browser and navigate to the extensions page:
-   - **Chrome / Arc / Brave:** `chrome://extensions/`
+
+3. Open your browser's extensions page:
+   - **Chrome / Brave / Arc:** `chrome://extensions/`
    - **Edge:** `edge://extensions/`
-4. Toggle **Developer mode** in the top-right corner.
-5. Click **Load unpacked** and select the `.output/chrome-mv3` folder inside the project.
+
+4. Turn on **Developer mode** (top-right toggle).
+
+5. Click **Load unpacked** and select the `.output/chrome-mv3` folder inside the project directory.
 
 ---
 
-## Development / Local Setup
+## Development
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v20 or higher recommended)
 - [pnpm](https://pnpm.io/) (v10.9.0 or higher)
 
-### Setup Steps
+### Getting Started
 
-1. **Clone the repository:**
+1. Clone the repository:
    ```bash
    git clone https://github.com/ayushmxxn/tabin.git
    cd tabin
    ```
 
-2. **Install dependencies:**
+2. Install dependencies:
    ```bash
    pnpm install
    ```
 
-3. **Start the development server:**
+3. Start the development server:
    ```bash
    pnpm dev
    ```
-   WXT will compile the extension and automatically open a clean Chrome profile with Tabin loaded and hot-module replacement (HMR) enabled.
+   WXT will build the extension and launch a browser window with Tabin loaded and hot module replacement (HMR) active.
 
    To develop for Firefox:
    ```bash
@@ -108,29 +118,29 @@
 
 ## Tech Stack
 
-- **Framework:** [WXT](https://wxt.dev/) — Next-generation Web Extension Framework
+- **Framework:** [WXT](https://wxt.dev/) (Web Extension Framework)
 - **Core:** [React 19](https://react.dev/) & [TypeScript](https://www.typescriptlang.org/)
 - **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) with `@tailwindcss/vite`
-- **Animations:** [Motion](https://motion.dev/) (Framer Motion v13)
-- **State Management:** [Zustand](https://zustand.docs.pmnd.rs/) (Local storage synced)
-- **Icons & UI:** Lucide React icons, native CSS glassmorphism, and custom branding assets
+- **Animations:** [Motion](https://motion.dev/)
+- **State Management:** [Zustand](https://zustand.docs.pmnd.rs/) (synced to local storage)
+- **Icons & UI:** Lucide React icons, native CSS glassmorphism
 
 ---
 
-## Privacy / Local-First
+<a id="privacy"></a>
 
-Tabin is built strictly on local-first principles:
+## Privacy
 
-- **Zero Cloud Sync:** All shortcuts, folders, settings, notes, and tab sessions are saved exclusively in your browser's local storage (`chrome.storage.local`).
-- **No Telemetry or Tracking:** Tabin contains no analytics scripts, cookies, or remote logging.
-- **Direct Requests Only:** Metadata and favicon fetching occurs directly between your browser and the respective bookmarked sites, with no intermediary servers.
+Tabin is built strictly on local-first principles. Your browsing data belongs to you:
+
+- **Saved on your machine:** All shortcuts, folders, settings, notes, and tab sessions are stored exclusively in your browser's local storage (`chrome.storage.local`).
+- **No telemetry or tracking:** Tabin contains no analytics scripts, tracking cookies, or remote logging.
+- **Direct requests:** Favicons and metadata are fetched directly between your browser and the respective websites, with no intermediary servers.
 
 For full details, read the [Privacy Policy](PRIVACY.md).
 
 ---
 
-## Open Source / License
+## License
 
 Tabin is open source software licensed under the [MIT License](https://opensource.org/licenses/MIT).
-
-
