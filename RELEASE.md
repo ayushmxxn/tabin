@@ -30,8 +30,8 @@ Every package is verified:
 2. Click **New item** (or **Upload new package** if updating).
 3. Select and upload `dist/releases/tabin-chrome.zip`.
 4. **Store Listing**:
-   - **Name:** `Tabin`
-   - **Summary:** `Turn your New Tab into a visual home for your favorite websites.`
+   - **Name:** `Tabin: New Tab and Bookmark Manager`
+   - **Summary:** `A personal new tab for organizing bookmarks, websites, folders, saved tabs, and notes.`
    - **Category:** `Productivity`
    - **Language:** `English`
    - **Icon:** Upload `public/icon-128.png` (or `public/icon/128.png`).

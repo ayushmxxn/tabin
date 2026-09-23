@@ -27,7 +27,7 @@ export function AboutTab() {
             </span>
           </div>
           <p className="text-[12px] text-white/50 mt-1 leading-relaxed">
-            Turn your New Tab into a visual home for your favorite websites.
+            A personal new tab for organizing bookmarks, websites, folders, saved tabs, and notes.
           </p>
         </div>
       </div>

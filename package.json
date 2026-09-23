@@ -1,6 +1,6 @@
 {
   "name": "tabin",
-  "description": "Turn your New Tab into a visual home for your favorite websites.",
+  "description": "A personal new tab for organizing bookmarks, websites, folders, saved tabs, and notes.",
   "private": true,
   "version": "1.0.0",
   "type": "module",

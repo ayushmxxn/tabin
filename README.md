@@ -1,7 +1,7 @@
 <div align="center">
   <img src=".github/assets/logo.png" alt="Tabin Logo" width="80" height="80" />
   <h1>Tabin</h1>
-  <p>Turn your New Tab into a visual home for your favorite websites.</p>
+  <p>A personal new tab for organizing bookmarks, websites, folders, saved tabs, and notes.</p>
 
   <p>
     <a href="#features"><strong>Features</strong></a> •

@@ -9,9 +9,9 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: (env) => ({
-    name: "Tabin",
+    name: "Tabin: New Tab and Bookmark Manager",
     description:
-      "Turn your New Tab into a visual home for your favorite websites.",
+      "A personal new tab for organizing bookmarks, websites, folders, saved tabs, and notes.",
     version: "1.0.0",
     icons: {
       "16": "icon-16.png",
