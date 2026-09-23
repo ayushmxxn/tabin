@@ -8,11 +8,14 @@ export default defineConfig({
   vite: () => ({
     plugins: [tailwindcss()],
   }),
+  zip: {
+    excludeSources: ["dist/**"],
+  },
   manifest: (env) => ({
     name: "Tabin: New Tab and Bookmark Manager",
     description:
       "A personal new tab for organizing bookmarks, websites, folders, saved tabs, and notes.",
-    version: "1.0.0",
+    version: "1.0.1",
     icons: {
       "16": "icon-16.png",
       "32": "icon-32.png",

@@ -6,7 +6,7 @@ export function AboutTab() {
   const version =
     typeof chrome !== "undefined" && chrome.runtime?.getManifest
       ? chrome.runtime.getManifest().version
-      : "1.0.0";
+      : "1.0.1";
 
   return (
     <div className="flex flex-col gap-4">
